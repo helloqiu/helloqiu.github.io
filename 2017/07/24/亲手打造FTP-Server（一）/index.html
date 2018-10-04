@@ -1,0 +1,191 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>亲手打造FTP Server（一）介绍 | Helloqiu&#39;s Blog | helloqiu 的博客</title>
+
+  
+  <meta name="author" content="helloqiu">
+  
+
+  
+  <meta name="description" content="helloqiu 的博客">
+  
+
+  
+  
+  <meta name="keywords" content="">
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="亲手打造FTP Server（一）介绍"/>
+
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+
+  
+  <meta property="og:image" content="/favicon.ico"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Helloqiu&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">Helloqiu&#39;s Blog</a>
+    </h1>
+    <p class="site-description">helloqiu 的博客</p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        
+          <li><a href="/">主页</a></li>
+        
+      
+        
+          <li><a href="/archives">归档</a></li>
+        
+      
+        
+          <li><a href="/categories">分类</a></li>
+        
+      
+        
+          <li>
+            <a href="https://github.com/helloqiu"><i class="fab fa-github"></i></a>
+          </li>
+        
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <article>
+
+  
+    
+    <h3 class="article-title"><span>亲手打造FTP Server（一）介绍</span></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/07/24/亲手打造FTP-Server（一）/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-07-24T15:36:06.000Z">
+          2017-07-24
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p><img src="/uploads/ftp1/ftp1-logo.png" alt="logo"></p>
+<h1 id="前记"><a href="#前记" class="headerlink" title="前记"></a>前记</h1><p>FTP 是 <em>File Transfer Protocol</em> 的缩写，顾名思义，是一种处于应用层的用于文件传输的协议。它曾红极一时，即使现在也有许多的应用实例。我将在接下来几篇 blog 中讲述我是如何编写一个最小 FTP Server 的。<br><a id="more"></a></p>
+<h1 id="协议简述"><a href="#协议简述" class="headerlink" title="协议简述"></a>协议简述</h1><p>FTP 协议可以分为两个部分，一部分用于传输控制命令，一部分用于传输需要的数据，比如当前的目录或者是要传输的文件。</p>
+<h2 id="被动模式"><a href="#被动模式" class="headerlink" title="被动模式"></a>被动模式</h2><p>在被动模式下，客户端通过控制命令与服务端交互，当需要传输数据时，服务器会在某个端口进行监听，并把端口号通过控制部分返回给客户端，当客户端连接上了这个端口，就可以进行数据的传输。<br><img src="/uploads/ftp1/ftp1-1.png" alt="simple example"><br>上图是一个简单的 server 和 client 通信的例子。<br>首先 client 向 server 发送了用户名和密码，server 验证成功后 client 向 server 发送 LIST 请求当前目录的文件列表，并指定使用 PASV 即被动模式。像之前所说的那样，server 打开了一个端口，并把地址和端口通过一个六元组的形式返回给了 client，client 只要再连接上这个地址和端口就可以获取到文件列表的数据。<br>以此类推，在被动模式下都是用类似的方式来传输数据的。</p>
+<h2 id="实现的命令"><a href="#实现的命令" class="headerlink" title="实现的命令"></a>实现的命令</h2><p>为了实现一个功能完整的 FTP Server，我从 FTP 协议中选择了以下几条命令来进行实现。</p>
+<ul>
+<li><strong>USER</strong><br>输入用户名。</li>
+<li><strong>PASS</strong><br>输入密码。</li>
+<li><strong>PWD</strong><br>显示当前目录。</li>
+<li><strong>MKD</strong><br>创建文件夹。</li>
+<li><strong>RMD</strong><br>删除文件夹。</li>
+<li><strong>MLSD</strong><br>如果目录被命名，列出目录的内容。</li>
+<li><strong>TYPE</strong><br>指定传输模式。</li>
+<li><strong>FEAT</strong><br>获取支持的模式。</li>
+<li><strong>LIST</strong><br>获取当前目录的内容。</li>
+<li><strong>CWD</strong><br>改变当前目录。</li>
+<li><strong>RETR</strong><br>传输文件。</li>
+<li><strong>STOR</strong><br>上传文件。</li>
+<li><strong>DELE</strong><br>删除文件。</li>
+<li><strong>RNTO</strong><br>重命名文件到指定位置。</li>
+</ul>
+<p>具体这些命令是如何实现的将在之后进行说明。</p>
+
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+  </div>
+</article>
+
+  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
+
+	<script type="text/javascript">
+	var disqus_shortname = 'helloqiublog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
+
+
+
+
+
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    
+    &copy; 2018 helloqiu
+    
+  </p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>

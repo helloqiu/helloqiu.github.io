@@ -1,0 +1,172 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>记一次失败的技术尝试 | Helloqiu&#39;s Blog | helloqiu 的博客</title>
+
+  
+  <meta name="author" content="helloqiu">
+  
+
+  
+  <meta name="description" content="helloqiu 的博客">
+  
+
+  
+  
+  <meta name="keywords" content="">
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="记一次失败的技术尝试"/>
+
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+
+  
+  <meta property="og:image" content="/favicon.ico"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Helloqiu&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">Helloqiu&#39;s Blog</a>
+    </h1>
+    <p class="site-description">helloqiu 的博客</p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        
+          <li><a href="/">主页</a></li>
+        
+      
+        
+          <li><a href="/archives">归档</a></li>
+        
+      
+        
+          <li><a href="/categories">分类</a></li>
+        
+      
+        
+          <li>
+            <a href="https://github.com/helloqiu"><i class="fab fa-github"></i></a>
+          </li>
+        
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <article>
+
+  
+    
+    <h3 class="article-title"><span>记一次失败的技术尝试</span></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/01/03/记一次失败的技术尝试/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-01-02T16:28:02.000Z">
+          2017-01-03
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>之前有一段时间没有什么事情做，突然突发奇想，想要自己写一个 static blog generator。当你看到标题的时候，可能你已经意识到了这次重复造轮子计划是失败的，但我认为我在这一过程中还是收获了一些东西的，所以我要记录下来。<br><a id="more"></a></p>
+<h1 id="最初的想法"><a href="#最初的想法" class="headerlink" title="最初的想法"></a>最初的想法</h1><p>当我决定造这个轮子的时候，我知道现在已经有了很多实用的类似的工具，所以根据创新的理念，我要在这一次的尝试之中尝试一些新的东西。<br>现在的大部分静态博客工具的原理基本上是利用模板渲染的方法利用预先制作的主题即模板和博客的内容生成纯静态的 html 内容。模板渲染在现在这个前端火热的阶段来看有一些显得陈旧与笨拙，这种方式没有体现出现在前端的技术栈的优势所在，但我认为利用这种方法来生成博客没有什么黑点，它够简单也够方便。<br>当然它也有那么几个缺点，比如开发主题时不够方便，模板语言远没有现在流行的前后端分离的方式来的灵活多变。所以本着折腾的想法，一个创意出现在了我的脑海中。<br>首先我将记录博文内容的 markdown 文件编译成 html，然后将它存储到一个 sqlite 数据库文件中。这个文件就是整个博客的核心，在 generate 的时候，我将数据库中的文件通过一个简单的 web 服务器 serve 出来，然后通过前端的 pre-render 技术来生成最终静态的博客内容。</p>
+<h1 id="为什么失败"><a href="#为什么失败" class="headerlink" title="为什么失败"></a>为什么失败</h1><p>花费了半个月的业余时间，我成功的实现了前端以外的部分，我用 python 写了一个叫 catstalk 的包，在编译 markdown 的阶段比较简单，有现成的可以使用，sqlite 的部分我用了 peewee，写了几个简单的模型，至于 serve 的部分，我用 tornado 写了几个 api 用来 serve。我为这个包添加了详细的测试，并把它开源在了 <a href="https://github.com/helloqiu/Catstalk" target="_blank" rel="noopener">github</a> 上。<br>直到今天早上，我开始了前端部分的编写，这也是为什么我放弃了这个方案的原因。<br>首先前端我用了 vue 的方案，vuex + vue-router + vue-resource 的组合之前我也用过。可能作为一个前后端分离的 web 应用来说我是成功的，但作为一个以纯静态为目的的 blog 系统。<br>我花了大量的功夫在后端数据的请求上，模板渲染的方案完全不需要花费这么多功夫在这上面。其次，pre-render 实在是非常的不容易使用，我用了 prerender-spa-plugin 这个 webpack 的插件来生成静态的页面，它的方案是使用 phantom.js 来模拟浏览器运行前端的程序，在特定的条件满足之后把当前浏览器的页面生成为静态的 html 文件，这是行的通的，但它并不容易使用。其次是我对前端仍然并不熟悉，我很难独立完成这样一个前端的应用。<br>所以我放弃了。<br>sad（<br>所以我的确学到了不要轻易挖坑。<br>也许我可以再利用一下我的聪明才智思考一下有没有更加棒的方案。:)</p>
+
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+  </div>
+</article>
+
+  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
+
+	<script type="text/javascript">
+	var disqus_shortname = 'helloqiublog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
+
+
+
+
+
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    
+    &copy; 2018 helloqiu
+    
+  </p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>

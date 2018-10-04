@@ -1,0 +1,606 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Helloqiu&#39;s Blog | helloqiu 的博客</title>
+
+  
+  <meta name="author" content="helloqiu">
+  
+
+  
+  <meta name="description" content="helloqiu 的博客">
+  
+
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  
+
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+
+  
+  <meta property="og:image" content="/favicon.ico"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Helloqiu&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">Helloqiu&#39;s Blog</a>
+    </h1>
+    <p class="site-description">helloqiu 的博客</p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        
+          <li><a href="/">主页</a></li>
+        
+      
+        
+          <li><a href="/archives">归档</a></li>
+        
+      
+        
+          <li><a href="/categories">分类</a></li>
+        
+      
+        
+          <li>
+            <a href="https://github.com/helloqiu"><i class="fab fa-github"></i></a>
+          </li>
+        
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <img src="/uploads/avatar.png" alt="avatar" class="index-avatar">
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2018/03/10/store-forwarding-speedup-现象/"><span>Store-forwarding Speedup 现象</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2018/03/10/store-forwarding-speedup-现象/" rel="bookmark">
+        <time class="entry-date published" datetime="2018-03-10T09:09:13.000Z">
+          2018-03-10
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>昨天我在知乎上看到了这样一个有趣的问题：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;time.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">int</span> p, q;</div><div class="line">    <span class="keyword">clock_t</span> s,e;</div><div class="line">    s=clock();</div><div class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; <span class="number">1000</span>; i++)&#123;</div><div class="line">        <span class="keyword">for</span>(<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; <span class="number">1000</span>; j++)&#123;</div><div class="line">            <span class="keyword">for</span>(<span class="keyword">int</span> k = <span class="number">1</span>; k &lt; <span class="number">1000</span>; k++)&#123;</div><div class="line">                p = i + j * k;</div><div class="line">                q = p;  <span class="comment">//Removing this line can increase running time.</span></div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    e = clock();</div><div class="line">    <span class="keyword">double</span> t = (<span class="keyword">double</span>)(e - s) / CLOCKS_PER_SEC;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"%lf\n"</span>, t);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在一个三重循环的内部加入了一条赋值语句，却让整个程序的速度变快了！<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2018/03/10/store-forwarding-speedup-现象/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2018/02/16/新年的三个关键词/"><span>新年的三个关键词</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2018/02/16/新年的三个关键词/" rel="bookmark">
+        <time class="entry-date published" datetime="2018-02-15T17:13:09.000Z">
+          2018-02-16
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>新年好，2018年开始了。<br><img src="/uploads/新年的三个关键词/春联.png" alt="深夜"><br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/生活/">生活</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2018/02/16/新年的三个关键词/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2018/02/04/考研失败/"><span>考研失败</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2018/02/04/考研失败/" rel="bookmark">
+        <time class="entry-date published" datetime="2018-02-04T01:59:23.000Z">
+          2018-02-04
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>当零点出成绩的那一刻，我知道我失败了。<br>想想我这一路走的都有点顺，这当头一棒，也不算是什么坏事。<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/生活/">生活</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2018/02/04/考研失败/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2017/11/22/距离考研还有一个月/"><span>距离考研还有一个月</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/11/22/距离考研还有一个月/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-11-21T20:52:18.000Z">
+          2017-11-22
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>今天是十一月二是二号，距离十二月二十三号还有31天，正好一个月。<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/生活/">生活</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2017/11/22/距离考研还有一个月/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2017/10/18/Telegram-Bot-推荐/"><span>Telegram Bot 推荐</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/10/18/Telegram-Bot-推荐/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-10-18T05:40:26.000Z">
+          2017-10-18
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>最近经常用 Telegram，发现 Telegram 下有很多好用的 Bot，记录一下也让更多的朋友 play play。<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2017/10/18/Telegram-Bot-推荐/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2017/10/04/如何写一段简单的shellcode/"><span>如何写一段简单的shellcode</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/10/04/如何写一段简单的shellcode/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-10-03T17:28:40.000Z">
+          2017-10-04
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <h1 id="0x0-唠叨"><a href="#0x0-唠叨" class="headerlink" title="0x0 唠叨"></a>0x0 唠叨</h1><p>许久未更新 blog，最近由于要考研忙得很，但是还是挤出时间来研究了一下 shellcode。<br>研究这个的原因是因为 CNSS 又一次把不用任何形式的括号写 helloworld 搬上了招新测试，本着搞事的原则，我决定花点时间来玩一玩。<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2017/10/04/如何写一段简单的shellcode/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2017/07/28/猫奴体验一个月/"><span>猫奴体验一个月</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/07/28/猫奴体验一个月/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-07-28T11:52:10.000Z">
+          2017-07-28
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p>本文转自我的知乎。= =<br>暑假的时候 @吴不胖由于要外出打工，于是把他家的猫——榴莲放在了留守成都的我这，体验猫奴的日子已有一个月了。<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/瞎扯/">瞎扯</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2017/07/28/猫奴体验一个月/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+  
+    <article>
+
+  
+    
+    <h3 class="article-title"><a href="/2017/07/24/亲手打造FTP-Server（一）/"><span>亲手打造FTP Server（一）介绍</span></a></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/07/24/亲手打造FTP-Server（一）/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-07-24T15:36:06.000Z">
+          2017-07-24
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p><img src="/uploads/ftp1/ftp1-logo.png" alt="logo"></p>
+<h1 id="前记"><a href="#前记" class="headerlink" title="前记"></a>前记</h1><p>FTP 是 <em>File Transfer Protocol</em> 的缩写，顾名思义，是一种处于应用层的用于文件传输的协议。它曾红极一时，即使现在也有许多的应用实例。我将在接下来几篇 blog 中讲述我是如何编写一个最小 FTP Server 的。<br>
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+    <div class="article-meta pull-right">
+      <span>
+        <i class="icon-comments"></i>
+        <span>
+          <a href="/2017/07/24/亲手打造FTP-Server（一）/#comment">评论</a>
+        </span>
+      </span>
+    </div>
+    
+  </div>
+</article>
+
+
+  
+
+
+<nav class="pagination">
+  
+  
+  <a href="/page/2/" class="pagination-next">下一页</a>
+  
+</nav>
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    
+    &copy; 2018 helloqiu
+    
+  </p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>

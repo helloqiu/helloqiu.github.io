@@ -1,0 +1,181 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>如何写一段简单的shellcode | Helloqiu&#39;s Blog | helloqiu 的博客</title>
+
+  
+  <meta name="author" content="helloqiu">
+  
+
+  
+  <meta name="description" content="helloqiu 的博客">
+  
+
+  
+  
+  <meta name="keywords" content="">
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="如何写一段简单的shellcode"/>
+
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+
+  
+  <meta property="og:image" content="/favicon.ico"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Helloqiu&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">Helloqiu&#39;s Blog</a>
+    </h1>
+    <p class="site-description">helloqiu 的博客</p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        
+          <li><a href="/">主页</a></li>
+        
+      
+        
+          <li><a href="/archives">归档</a></li>
+        
+      
+        
+          <li><a href="/categories">分类</a></li>
+        
+      
+        
+          <li>
+            <a href="https://github.com/helloqiu"><i class="fab fa-github"></i></a>
+          </li>
+        
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <article>
+
+  
+    
+    <h3 class="article-title"><span>如何写一段简单的shellcode</span></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/10/04/如何写一段简单的shellcode/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-10-03T17:28:40.000Z">
+          2017-10-04
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <h1 id="0x0-唠叨"><a href="#0x0-唠叨" class="headerlink" title="0x0 唠叨"></a>0x0 唠叨</h1><p>许久未更新 blog，最近由于要考研忙得很，但是还是挤出时间来研究了一下 shellcode。<br>研究这个的原因是因为 CNSS 又一次把不用任何形式的括号写 helloworld 搬上了招新测试，本着搞事的原则，我决定花点时间来玩一玩。<br><a id="more"></a></p>
+<h1 id="0x1-思路"><a href="#0x1-思路" class="headerlink" title="0x1 思路"></a>0x1 思路</h1><p>不用任何形式的括号，大概的思路就是直接把机器码写到一个变量里，然后再运行这个变量里的机器码。<br>想到这里，你可能会一把梭的想到这样的一段汇编：<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">section</span> .text</div><div class="line"><span class="meta">global</span> _start</div><div class="line"><span class="symbol">_start:</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">edx</span>,len</div><div class="line">  <span class="keyword">mov</span> <span class="built_in">ecx</span>,msg</div><div class="line">  <span class="keyword">mov</span> <span class="built_in">ebx</span>,<span class="number">1</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">eax</span>,<span class="number">4</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">eax</span>,<span class="number">1</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"></div><div class="line"><span class="meta">section</span> .data</div><div class="line"></div><div class="line">msg <span class="built_in">db</span> <span class="string">'Hello, world!'</span>, <span class="number">0xa</span></div><div class="line">len <span class="built_in">equ</span> $ - msg</div></pre></td></tr></table></figure></p>
+<p>嗯，这是一段很简单的 <em>x86 hello world</em> ，调用 linux 的系统调用然后打印输出数据段里的 <em>msg</em> 变量。<br>那我们试着把它变成 shellcode 来试试看。</p>
+<h1 id="0x2-错误的尝试"><a href="#0x2-错误的尝试" class="headerlink" title="0x2 错误的尝试"></a>0x2 错误的尝试</h1><p>那么我们先用汇编器把它变成 object file。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">% nasm -f elf blog.asm</div><div class="line">% objdump -d blog.o</div><div class="line"></div><div class="line">blog.o:     file format elf32-i386</div><div class="line"></div><div class="line"></div><div class="line">Disassembly of section .text:</div><div class="line"></div><div class="line">00000000 &lt;_start&gt;:</div><div class="line">   0:	ba 0e 00 00 00       	mov    $0xe,%edx</div><div class="line">   5:	b9 00 00 00 00       	mov    $0x0,%ecx</div><div class="line">   a:	bb 01 00 00 00       	mov    $0x1,%ebx</div><div class="line">   f:	b8 04 00 00 00       	mov    $0x4,%eax</div><div class="line">  14:	cd 80                	int    $0x80</div><div class="line">  16:	b8 01 00 00 00       	mov    $0x1,%eax</div><div class="line">  1b:	cd 80                	int    $0x80</div></pre></td></tr></table></figure>
+<p>看起来很不错，然后我们把它放到 C 语言里面，然后用 attribute 指定变量放到 text 段里。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">char</span>* shellcode __attribute__((section(<span class="string">".text"</span>))) =</div><div class="line"><span class="string">"\xba\x0e\x00\x00\x00\xb9\x00\x00\x00\x00\xbb\x01\x00\x00\x00\xb8\x04\x00\x00\x00\xcd\x80\xb8\x01\x00\x00\x00\xcd\x80"</span>;</div></pre></td></tr></table></figure></p>
+<p>然后我们编译运行，似乎我们就要成功了，然后结果你肯定得到的程序无法运行，这是为什么呢？<br>我们来简单的 trace 一下我们生成的程序运行时的情况。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">% strace ./blog</div><div class="line">execve(&quot;./blog&quot;, [&quot;./blog&quot;], 0x7ffe0ad18d60 /* 37 vars */) = 0</div><div class="line">strace: [ Process PID=18003 runs in 32 bit mode. ]</div><div class="line">write(1, NULL, 14)                      = -1 EFAULT (Bad address)</div><div class="line">exit(1)                                 = ?</div><div class="line">+++ exited with 1 +++</div></pre></td></tr></table></figure></p>
+<p>哇，为什么我们的地址变成 NULL 了呢？<br>这是因为在这种情况下，我们没有办法获得到 data 段里的地址。</p>
+<h1 id="0x3-重新来过"><a href="#0x3-重新来过" class="headerlink" title="0x3 重新来过"></a>0x3 重新来过</h1><p>这时候我们就需要魔改一下我们的汇编。<br>大家都知道，在汇编中进行 call 的时候，当前运行到的地址会被 push 到栈中，利用这个特性，我们可以在我们定义变量之前进行一个 call，然后在 call 的这个函数里面 pop 出变量的地址。<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line"><span class="meta">global</span> _start</div><div class="line"><span class="meta">section</span> .text</div><div class="line"><span class="symbol">_start:</span></div><div class="line">  <span class="keyword">jmp</span> short wrapper</div><div class="line"><span class="symbol">shellcode:</span></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">eax</span>, <span class="built_in">eax</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">al</span>, <span class="number">0x4</span></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">ebx</span>, <span class="built_in">ebx</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">bl</span>, <span class="number">0x1</span></div><div class="line">  <span class="keyword">pop</span> <span class="built_in">ecx</span></div><div class="line"></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">edx</span>, <span class="built_in">edx</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">dl</span>, <span class="number">11</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">eax</span>, <span class="built_in">eax</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">al</span>, <span class="number">0x1</span></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">ebx</span>, <span class="built_in">ebx</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">bl</span>, <span class="number">0</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"><span class="symbol"></span></div><div class="line">wrapper:</div><div class="line">  <span class="keyword">call</span> shellcode</div><div class="line"><span class="symbol">  message:</span> <span class="built_in">db</span> <span class="string">"bye world!"</span>, <span class="number">10</span></div></pre></td></tr></table></figure></p>
+<p>让我们再来试试：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">char</span>* main __attribute__((section(<span class="string">".text"</span>))) =</div><div class="line"><span class="string">"\xeb\x19\x31\xc0\xb0\x04\x31\xdb\xb3\x01\x59\x31\xd2\xb2\x0d\xcd\x80\x31\xc0\xb0\x01\x31\xdb\xb3\x00\xcd\x80\xe8\xe2\xff\xff\xff\x62\x79\x65\x20\x77\x6f\x72\x6c\x64\x21\x0a"</span>;</div></pre></td></tr></table></figure></p>
+<p><img src="/uploads/shellcode/result.png" alt="result"><br>哇，我们成功了！</p>
+<h1 id="尾声"><a href="#尾声" class="headerlink" title="尾声"></a>尾声</h1><p>所以这样我们就成功了，是不是很棒呢！<br>这只是 shellcode 的简单应用，具体如何真正应用 shellcode 去搞事情，等我哪天再有兴趣了再去研究。<br>（所以我最后还是用了小括号）逃）</p>
+
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+  </div>
+</article>
+
+  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
+
+	<script type="text/javascript">
+	var disqus_shortname = 'helloqiublog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
+
+
+
+
+
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    
+    &copy; 2018 helloqiu
+    
+  </p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>

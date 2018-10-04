@@ -1,0 +1,181 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>怎样用 WeRoBot 制作一个微信公众号 | Helloqiu&#39;s Blog | helloqiu 的博客</title>
+
+  
+  <meta name="author" content="helloqiu">
+  
+
+  
+  <meta name="description" content="helloqiu 的博客">
+  
+
+  
+  
+  <meta name="keywords" content="">
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="怎样用 WeRoBot 制作一个微信公众号"/>
+
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+
+  
+  <meta property="og:image" content="/favicon.ico"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Helloqiu&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">Helloqiu&#39;s Blog</a>
+    </h1>
+    <p class="site-description">helloqiu 的博客</p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        
+          <li><a href="/">主页</a></li>
+        
+      
+        
+          <li><a href="/archives">归档</a></li>
+        
+      
+        
+          <li><a href="/categories">分类</a></li>
+        
+      
+        
+          <li>
+            <a href="https://github.com/helloqiu"><i class="fab fa-github"></i></a>
+          </li>
+        
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <article>
+
+  
+    
+    <h3 class="article-title"><span>怎样用 WeRoBot 制作一个微信公众号</span></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2016/08/14/HowToMakeAWeChatOfficalAccount/" rel="bookmark">
+        <time class="entry-date published" datetime="2016-08-14T01:54:08.000Z">
+          2016-08-14
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <h1 id="0x0-杂谈"><a href="#0x0-杂谈" class="headerlink" title="0x0 杂谈"></a>0x0 杂谈</h1><p>暑假里面除了在看书以外，还在维护 <em>whtsky</em> 的 <a href="https://github.com/whtsky/WeRoBot" target="_blank" rel="noopener">WeRoBot</a> 这个项目。WeRoBot 是他高一用 Python 写的一个微信的公众号开发框架，由于高考的原因他暂停了一段时间的维护。<br>上个学期在我的极力鼓吹下，我们一起用它申报了学院的创新创业项目，希望能得到一些经费用来继续维护。最终虽然经费不多，但是我们仍然在暑假开始之前开始了新版本的开发。<br>这篇文章我主要是想记录一下自己用 WeRoBot 制作进行微信公众号开发的过程，其实是非常有趣的。( ˙˘˙ )<br><a id="more"></a></p>
+<h1 id="0x1-谈谈需求"><a href="#0x1-谈谈需求" class="headerlink" title="0x1 谈谈需求"></a>0x1 谈谈需求</h1><p>那么到底我们要做一个怎样的公众号呢？这里我要引见一个新的项目。<br>在上一个暑假，<em>whtsky</em> 在暑假作业中用 <em>Python3.4 +</em> 出现的新特性协程(<em>Asyncio</em>)写了一个 DHT 爬虫，并且把抓到的种子信息做成了一个资源站，并且取名为 <strong>傻狍子</strong>。我们的公众号便是为傻狍子开发的，我们将把用户发给我们的一切信息作为检索条件，调用傻狍子的 API 来获取所有符合的种子信息，然后把信息返回给用户。  </p>
+<p><img src="/uploads/ShaPaoZi_Model.png" alt="ShaPaoZi Model"></p>
+<h1 id="0x2-开始干"><a href="#0x2-开始干" class="headerlink" title="0x2 开始干"></a>0x2 开始干</h1><p>首先，我们需要整理一下 ShaPaoZi 的 API。<br>我们的目的是从傻狍子搜索想要的种子信息，所以我们只需要搜索的这个 API。  </p>
+<p><img src="/uploads/ShaPaoZi_API.png" alt="ShaPaoZi API"><br>这个 API 的调用方法一目了然，不多赘述。  </p>
+<p>然后我们开始写真正的公众号部分。由于 WeRoBot 现在的新版本还在开发，而我又不打算有旧的代码，所以直接从 GitHub 克隆 <em>develop</em> 分支的代码。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># Life is short so let's just download one depth</span></div><div class="line">git <span class="built_in">clone</span> https://github.com/whtsky/WeRoBot --depth=1</div><div class="line"><span class="built_in">cd</span> WeRoBot</div><div class="line">python setup.py install</div><div class="line"><span class="built_in">cd</span> ..</div><div class="line">sudo rm -R WeRoBot</div></pre></td></tr></table></figure></p>
+<p>安装好了之后我们来创建一个 <em>app.py</em>，具体内容如下：<br><figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># -*- coding: utf-8 -*-</span></div><div class="line"></div><div class="line"><span class="keyword">from</span> werobot <span class="keyword">import</span> WeRoBot</div><div class="line"><span class="keyword">import</span> requests</div><div class="line"><span class="keyword">import</span> time</div><div class="line"></div><div class="line">token = <span class="string">'YourToken'</span></div><div class="line">encoding_aes_key = <span class="string">'YourKey'</span></div><div class="line">app_id = <span class="string">'YourID'</span></div><div class="line"></div><div class="line">robot = WeRoBot(token=token,</div><div class="line">                encoding_aes_key=encoding_aes_key,</div><div class="line">                app_id=app_id)</div><div class="line"></div><div class="line"></div><div class="line"><span class="meta">@robot.text</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">search</span><span class="params">(message)</span>:</span></div><div class="line">    url = <span class="string">'http://www.shapaozi.me/api/search/%s'</span> % message.content</div><div class="line">    result = requests.get(url).json()</div><div class="line">    return_value = <span class="string">''</span></div><div class="line">    return_value += <span class="string">'搜索到 %d 个结果:\n'</span> % result[<span class="string">'total'</span>]</div><div class="line">    <span class="keyword">for</span> page <span class="keyword">in</span> range(<span class="number">1</span>, result[<span class="string">'max_page'</span>] + <span class="number">1</span>):</div><div class="line">        <span class="keyword">if</span> page &gt; <span class="number">1</span>:</div><div class="line">            result = requests.get(url + (<span class="string">'/page/%d'</span> % page)).json()</div><div class="line">        <span class="keyword">for</span> r <span class="keyword">in</span> result[<span class="string">'results'</span>]:</div><div class="line">            return_value += <span class="string">'='</span> * <span class="number">5</span></div><div class="line">            return_value += <span class="string">'\n'</span></div><div class="line"></div><div class="line">            r[<span class="string">'last_seen'</span>] = time.strftime(<span class="string">"%Y-%m-%d %H:%M:%S"</span>, time.localtime(r[<span class="string">'last_seen'</span>]))</div><div class="line">            r[<span class="string">'length'</span>] = <span class="string">'%dMB'</span> % int(r[<span class="string">'length'</span>] / <span class="number">1024</span> / <span class="number">1024</span>)</div><div class="line"></div><div class="line">            return_value += <span class="string">'名称: %s\n'</span> % r[<span class="string">'title'</span>]</div><div class="line">            return_value += <span class="string">'大小: %s\n'</span> % r[<span class="string">'length'</span>]</div><div class="line">            return_value += <span class="string">'记录时间: %s\n'</span> % r[<span class="string">'last_seen'</span>]</div><div class="line">            return_value += <span class="string">'详情页: http://www.shapaozi.me/detail/%s\n'</span> % r[<span class="string">'infohash'</span>]</div><div class="line">            return_value += <span class="string">'='</span> * <span class="number">5</span></div><div class="line">            return_value += <span class="string">'\n'</span></div><div class="line"></div><div class="line">    <span class="keyword">return</span> return_value</div><div class="line"></div><div class="line"></div><div class="line"><span class="meta">@robot.subscribe</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">hello</span><span class="params">(message)</span>:</span></div><div class="line">    <span class="keyword">return</span> <span class="string">'欢迎关注超级可爱的 ShaPaoZi ( ˙˘˙ )\n请直接回复查询内容。'</span></div><div class="line"></div><div class="line"></div><div class="line"><span class="keyword">from</span> bottle <span class="keyword">import</span> Bottle</div><div class="line"><span class="keyword">from</span> werobot.contrib.bottle <span class="keyword">import</span> make_view</div><div class="line"></div><div class="line">app = Bottle()</div><div class="line">app.route(<span class="string">'/robot'</span>,</div><div class="line">          [<span class="string">'GET'</span>, <span class="string">'POST'</span>],</div><div class="line">          make_view(robot))</div></pre></td></tr></table></figure></p>
+<p>我们总共设计了两个 handler，<em>hello</em> 用来发送欢迎信息，而 <em>search</em> 用来把用户发送的每一条消息当做搜索内容去傻狍子查询，再把查询结果调整一下返回给用户。<br>是不是非常的简单！最后我们使用 <em>Bottle</em> 来做 WEB 框架，并把访问路径设置成 <em>/robot</em>，这样我们的公众号就开发好了！</p>
+<h1 id="0x3-部署"><a href="#0x3-部署" class="headerlink" title="0x3 部署"></a>0x3 部署</h1><p>最终我们需要把这个服务部署到服务器上，首先用 <em>gunicorn</em> 把服务先跑起来，当然你也可以用其他的 <em>WSGI</em> Server。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">setsid gunicorn app:app --bind=<span class="string">"localhost:5000"</span> -w 4 --access-logfile access.log</div></pre></td></tr></table></figure></p>
+<p>这样公众号服务就在本地的 5000 端口启动了，并启动了四个线程。接下来使用 <em>nginx</em> 做一个反向代理，用 80 端口代理本地的 5000 端口。<br><em>nginx</em> 具体配置不贴了，看看文档比啥都强。  </p>
+<p>最终的效果图：<br><img src="/uploads/ShaPaoZi_Use.png" alt="ShaPaoZi_Use"></p>
+<h1 id="0x4-最后"><a href="#0x4-最后" class="headerlink" title="0x4 最后"></a>0x4 最后</h1><p>嘿嘿嘿，其实非常简单。( ˙˘˙ )</p>
+
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+  </div>
+</article>
+
+  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
+
+	<script type="text/javascript">
+	var disqus_shortname = 'helloqiublog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
+
+
+
+
+
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    
+    &copy; 2018 helloqiu
+    
+  </p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>

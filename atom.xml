@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Helloqiu&#39;s Blog</title>
+  <subtitle>helloqiu 的博客</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="https://helloqiu.github.io/"/>
+  <updated>2018-10-04T13:29:12.180Z</updated>
+  <id>https://helloqiu.github.io/</id>
+  
+  <author>
+    <name>helloqiu</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Store-forwarding Speedup 现象</title>
+    <link href="https://helloqiu.github.io/2018/03/10/store-forwarding-speedup-%E7%8E%B0%E8%B1%A1/"/>
+    <id>https://helloqiu.github.io/2018/03/10/store-forwarding-speedup-现象/</id>
+    <published>2018-03-10T09:09:13.000Z</published>
+    <updated>2018-10-04T13:29:12.180Z</updated>
+    
+    <content type="html"><![CDATA[<p>昨天我在知乎上看到了这样一个有趣的问题：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;time.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">int</span> p, q;</div><div class="line">    <span class="keyword">clock_t</span> s,e;</div><div class="line">    s=clock();</div><div class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; <span class="number">1000</span>; i++)&#123;</div><div class="line">        <span class="keyword">for</span>(<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; <span class="number">1000</span>; j++)&#123;</div><div class="line">            <span class="keyword">for</span>(<span class="keyword">int</span> k = <span class="number">1</span>; k &lt; <span class="number">1000</span>; k++)&#123;</div><div class="line">                p = i + j * k;</div><div class="line">                q = p;  <span class="comment">//Removing this line can increase running time.</span></div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    e = clock();</div><div class="line">    <span class="keyword">double</span> t = (<span class="keyword">double</span>)(e - s) / CLOCKS_PER_SEC;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"%lf\n"</span>, t);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>在一个三重循环的内部加入了一条赋值语句，却让整个程序的速度变快了！<br><a id="more"></a><br>对于这种类似玄学的问题，反正我是不太懂的，于是在好奇心的驱使下去 Stack Overflow 上提问了一下，没想到马上得到了解答。<br>首先，我把在 <strong>x64</strong> 下用 <strong>gcc 7.3.0</strong> 配合 <strong>-O0</strong> 得到的汇编代码放到了<a href="https://gist.github.com/helloqiu/0a3354cff566c240625e840f388ae00a" target="_blank" rel="noopener">这里</a>。<br>通过汇编我们可以看到，两份代码会议的不同就是在 <strong>addl $1, -12(%rbp)</strong> 之前，多了<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">movl	-<span class="number">44</span>(%rbp), %eax</div><div class="line">movl	%eax, -<span class="number">48</span>(%rbp)</div></pre></td></tr></table></figure></p>
+<p>这两行。这就是问题的核心，明明多了这两个 memory -&gt; register 和 register -&gt; memory 的操作，为什么反而变快了？<br>根据 Stack Overflow 上的回答</p>
+<blockquote>
+<p>If you’re on Skylake, store/reload latency can actually be lower (better) when the reload can’t try to execute right away. Having more independent loads/stores in between the dependent pair may explain it in your case.</p>
+</blockquote>
+<p>大体意思是说在 store 之后重新 reload 之间如果加入一些不相关的 load/store，在 Skylake 上时延要短一些。所以这一部分的下一句<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">addl	<span class="number">$1</span>, -<span class="number">12</span>(%rbp)</div></pre></td></tr></table></figure></p>
+<p>也就是说，在两次 k + 1 并且 CMP 的过程中，本该串行的后续操作由于乱序执行或者分支预测或者其他某些技术，让内层循环的包含不相关的 load/store 的代码已经在流水线上执行了，这让这个 6 个周期的操作实际上减小到 4-5 个周期。</p>
+<p>同时，回答还补充了现代的 CPU 都支持 memory renaming （我猜和计算机系统结构讲的寄存器重命名类似）,也就是说根据分支预测，还在这里对 k 进行加一的时候，对 p 的操作就已经在执行了，但这样会造成数据冒险，这种内存重命名的方式可以解决这种冒险让这个解释成立。</p>
+<p>同时，回答还还补充了内层的循环是可以同时执行多个的，因为 memory-order buffer 可以追踪每次 load 之前的 store，不用等待 store 写入 L1D（一级数据缓存），保证了这种多循环并行的正确性。</p>
+<p>同时，回答还还还补充了，这种在循环里加代码的模式能不能用到真正的编程中呢？不能，因为编译器会把最内层循环的循环变量保存在寄存器中，并且那些没有意义的操作会直接被编译器优化掉，这也是为什么开了 -O2 这一部分代码就会执行飞快并且没有差别。几乎所有 Stack Overflow 上留言或者回答的人都说这种 -O0 的情况是不值得讨论的，因为生产环境不会用得到。</p>
+<p>同时，回答还还还还补充了，这种现象是 skylake 上的，在其余比如 Ryzen 处理器上，这种现象应该就不会出现。我实际上在 broadwell 上也复现了，但是在 raspberry pi 上得到的结果的确是删掉之后变快了，和这种奇怪的现象不符，which 验证了 Stack Overflow 上的回答。个人猜测这可能是 intel CPU 独有的特性。  </p>
+<p>附 <strong>Stack Overflow</strong> 上的链接：<a href="https://stackoverflow.com/questions/49189685/adding-a-redundant-assignment-speeds-up-code-when-compiled-without-optimization" target="_blank" rel="noopener">Add an assignment but the code runs faster</a><br><strong>知乎</strong>链接： <a href="https://www.zhihu.com/question/268453752/answer/338007479" target="_blank" rel="noopener">https://www.zhihu.com/question/268453752/answer/338007479</a></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;昨天我在知乎上看到了这样一个有趣的问题：&lt;br&gt;&lt;figure class=&quot;highlight c&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;1&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;2&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;3&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;4&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;5&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;6&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;7&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;8&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;9&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;10&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;11&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;12&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;13&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;14&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;15&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;16&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;17&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;18&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;19&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;20&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;meta&quot;&gt;#&lt;span class=&quot;meta-keyword&quot;&gt;include&lt;/span&gt;&lt;span class=&quot;meta-string&quot;&gt;&amp;lt;stdio.h&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;meta&quot;&gt;#&lt;span class=&quot;meta-keyword&quot;&gt;include&lt;/span&gt;&lt;span class=&quot;meta-string&quot;&gt;&amp;lt;time.h&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;main&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;()&lt;/span&gt; &lt;/span&gt;&amp;#123;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;int&lt;/span&gt; p, q;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;clock_t&lt;/span&gt; s,e;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    s=clock();&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt;(&lt;span class=&quot;keyword&quot;&gt;int&lt;/span&gt; i = &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;; i &amp;lt; &lt;span class=&quot;number&quot;&gt;1000&lt;/span&gt;; i++)&amp;#123;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;        &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt;(&lt;span class=&quot;keyword&quot;&gt;int&lt;/span&gt; j = &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;; j &amp;lt; &lt;span class=&quot;number&quot;&gt;1000&lt;/span&gt;; j++)&amp;#123;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;            &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt;(&lt;span class=&quot;keyword&quot;&gt;int&lt;/span&gt; k = &lt;span class=&quot;number&quot;&gt;1&lt;/span&gt;; k &amp;lt; &lt;span class=&quot;number&quot;&gt;1000&lt;/span&gt;; k++)&amp;#123;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;                p = i + j * k;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;                q = p;  &lt;span class=&quot;comment&quot;&gt;//Removing this line can increase running time.&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;            &amp;#125;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;        &amp;#125;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &amp;#125;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    e = clock();&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;double&lt;/span&gt; t = (&lt;span class=&quot;keyword&quot;&gt;double&lt;/span&gt;)(e - s) / CLOCKS_PER_SEC;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;built_in&quot;&gt;printf&lt;/span&gt;(&lt;span class=&quot;string&quot;&gt;&quot;%lf\n&quot;&lt;/span&gt;, t);&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;    &lt;span class=&quot;keyword&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;;&lt;/div&gt;&lt;div class=&quot;line&quot;&gt;&amp;#125;&lt;/div&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;在一个三重循环的内部加入了一条赋值语句，却让整个程序的速度变快了！&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>新年的三个关键词</title>
+    <link href="https://helloqiu.github.io/2018/02/16/%E6%96%B0%E5%B9%B4%E7%9A%84%E4%B8%89%E4%B8%AA%E5%85%B3%E9%94%AE%E8%AF%8D/"/>
+    <id>https://helloqiu.github.io/2018/02/16/新年的三个关键词/</id>
+    <published>2018-02-15T17:13:09.000Z</published>
+    <updated>2018-10-04T13:29:12.181Z</updated>
+    
+    <content type="html"><![CDATA[<p>新年好，2018年开始了。<br><img src="/uploads/新年的三个关键词/春联.png" alt="深夜"><br><a id="more"></a><br>看到很多人会在新的一年为自己设立三个关键词，我觉得这是一件好事，有计划(flag)总比没计划(flag)来得好。<br>所以在这2018年的开始之际，我也为自己设立三个关键词。</p>
+<h1 id="出国"><a href="#出国" class="headerlink" title="出国"></a>出国</h1><p>考研失败，为了能不陷入失学的尴尬境地，我只能屈辱出国了。<br>放在第一位是因为我觉得这真的是我2018年应该去忙的大事，毕竟我是一个学生，学习放在第一位我觉得是一件很正确的事。<br>希望我能顺利考出雅思6.5，然后出国上一年研究生，然后回国工作。</p>
+<h1 id="减肥"><a href="#减肥" class="headerlink" title="减肥"></a>减肥</h1><p>在去年，我好像也立下了减肥这个 Flag。<br>按照惯例，继续立。但今年给自己定一个数字的目标吧。<br>希望明年的今天我能到80kg。</p>
+<h1 id="读书"><a href="#读书" class="headerlink" title="读书"></a>读书</h1><p>读书是一件好事，可能通过书本我能明白很多不懂的道理，也能让自己变得更有内涵吧。<br>现在好像很少有人会在在乎读书这件事了。<br>希望我现在开始还为时未晚。</p>
+<p>最后祝我爱的人和爱我的人新年快乐！</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;新年好，2018年开始了。&lt;br&gt;&lt;img src=&quot;/uploads/新年的三个关键词/春联.png&quot; alt=&quot;深夜&quot;&gt;&lt;br&gt;
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>考研失败</title>
+    <link href="https://helloqiu.github.io/2018/02/04/%E8%80%83%E7%A0%94%E5%A4%B1%E8%B4%A5/"/>
+    <id>https://helloqiu.github.io/2018/02/04/考研失败/</id>
+    <published>2018-02-04T01:59:23.000Z</published>
+    <updated>2018-10-04T13:29:12.182Z</updated>
+    
+    <content type="html"><![CDATA[<p>当零点出成绩的那一刻，我知道我失败了。<br>想想我这一路走的都有点顺，这当头一棒，也不算是什么坏事。<br><a id="more"></a><br>失败了又会怎么样呢？<br>可能父母回了责骂我，他们需要责骂来宣泄他们的失望。亲戚朋友大抵也会极力来探听这件事，雪中送炭者少，落井下石者多，怕是我这一败也逃脱不了成为他们茶余饭后的谈资和取笑的谈资。<br>希望我好的人会失望，看热闹的人会暗中得意吧。<br>昨晚朋友告诉我了一句话：</p>
+<blockquote>
+<p>“你先睡一觉，等明天起来，有了满状态的智力，就可以规划人生。”</p>
+</blockquote>
+<p><img src="/uploads/考研失败/1.jpg" alt="榴莲" style="height: 512px;"></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;当零点出成绩的那一刻，我知道我失败了。&lt;br&gt;想想我这一路走的都有点顺，这当头一棒，也不算是什么坏事。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>相见不如怀念</title>
+    <link href="https://helloqiu.github.io/2018/01/13/%E7%9B%B8%E8%A7%81%E4%B8%8D%E5%A6%82%E6%80%80%E5%BF%B5/"/>
+    <id>https://helloqiu.github.io/2018/01/13/相见不如怀念/</id>
+    <published>2018-01-13T13:11:59.000Z</published>
+    <updated>2018-10-04T13:29:12.182Z</updated>
+    
+    <content type="html"><![CDATA[<p>终于，我又回到了这座城——青岛。<br>在下飞机的那一刻，重新呼吸冷的凛冽的空气，我意识到，我期待的不是故乡，而是有你的城市。<br>但我又在期待着什么呢？<br>呵，我终究是戒不掉对你千般万般想要止住的怀念。<br>相见不如怀念，这句话何尝不是循环的虚无的慰藉。<br>可我又能如何。<br><img src="/uploads/相见不如怀念/相见不如怀念.png" alt="相见不如怀念"></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;终于，我又回到了这座城——青岛。&lt;br&gt;在下飞机的那一刻，重新呼吸冷的凛冽的空气，我意识到，我期待的不是故乡，而是有你的城市。&lt;br&gt;但我又在期待着什么呢？&lt;br&gt;呵，我终究是戒不掉对你千般万般想要止住的怀念。&lt;br&gt;相见不如怀念，这句话何尝不是循环的虚无的慰藉。&lt;br&gt;可
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>距离考研还有一个月</title>
+    <link href="https://helloqiu.github.io/2017/11/22/%E8%B7%9D%E7%A6%BB%E8%80%83%E7%A0%94%E8%BF%98%E6%9C%89%E4%B8%80%E4%B8%AA%E6%9C%88/"/>
+    <id>https://helloqiu.github.io/2017/11/22/距离考研还有一个月/</id>
+    <published>2017-11-21T20:52:18.000Z</published>
+    <updated>2018-10-04T13:29:12.182Z</updated>
+    
+    <content type="html"><![CDATA[<p>今天是十一月二是二号，距离十二月二十三号还有31天，正好一个月。<br><a id="more"></a><br>准备考研大致已经有半年多的时间了，整个暑假我都没有回家，一个人蜗居在学校旁边的这30多平的小房间里学习。<br>这期间，伴随着巨大的焦虑，也有过迷茫，更不止一次想过放弃。<br>每当我想放弃的时候，我都会思考，如果放弃了我会怎么样。<br>我觉得现在是我人生的低谷，是我最为狼狈的一段时间。<br>从经济上来说，作为一个成年人，还处于需要父母供养的阶段。父母似乎也是一个矛盾的集合，既想让我继续读书，又眼红那些孩子已经工作了的人，在规劝我考研的同时，又不断向我传达经济的压力和自己想享天伦之乐的心情。<br>我从他们身上感受到了一种焦躁，但焦躁是成功的阻力，他们不应该把这种情绪传达给我。<br>从情感上来说，我经常会感觉到一种巨大的悲伤。同时我渐渐发现我对情感出现了一种冷漠的趋势。<br>哎，人生的低谷莫过于此，没有钱和感情，我感觉我在这个社会上寸步难行。<br>我也发现，我这个人没有梦想，就像在 MineCraft 里一样，我经常会在搭好小屋种好地能自给自足之后不会再继续冒险了，我满足于现在的生活。这导致了我经常性的随遇而安的心态，没有明确的目标，认为即使不完成一些东西我也可以活下去。<br>也许我在等待一个奋斗的理由，我在等待那个让我奋斗的人。<br>我多盼望你现在就能出现，陪我走过这段低谷，当我们回忆起来，这会是多么刻骨铭心的回忆。<br>但现在只有我一个人啊。<br><img src="/uploads/一人行者.jpg" alt="一人行者"></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;今天是十一月二是二号，距离十二月二十三号还有31天，正好一个月。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>Telegram Bot 推荐</title>
+    <link href="https://helloqiu.github.io/2017/10/18/Telegram-Bot-%E6%8E%A8%E8%8D%90/"/>
+    <id>https://helloqiu.github.io/2017/10/18/Telegram-Bot-推荐/</id>
+    <published>2017-10-18T05:40:26.000Z</published>
+    <updated>2018-10-04T13:29:12.180Z</updated>
+    
+    <content type="html"><![CDATA[<p>最近经常用 Telegram，发现 Telegram 下有很多好用的 Bot，记录一下也让更多的朋友 play play。<br><a id="more"></a></p>
+<h2 id="RustRSSBot"><a href="#RustRSSBot" class="headerlink" title="RustRSSBot"></a>RustRSSBot</h2><p><a href="https://github.com/iovxw/rssbot" target="_blank" rel="noopener">RustRssBot</a> 是一个可以推送 RSS 订阅的 Bot，顾名思义，是用 Rust 实现的。<br>相对于现在很多 RSS 订阅发邮件的服务都厚颜无耻的进行了收费，用一个简单的 Bot 来进行更新的推送其实可以满足我的大部分需求。<br>我的做法也很简单，建一个新的 Group 然后和 RssBot 来一个亲密的二人世界，这样就很棒了。<br><img src="/uploads/telegram-bot/rss.png" alt="RSSBot"></p>
+<h2 id="Countdown"><a href="#Countdown" class="headerlink" title="Countdown"></a>Countdown</h2><p><a href="https://telegram.me/ctdwnbot" target="_blank" rel="noopener">Countdown</a> 是一个可以帮你对某个日期进行倒计时的 Bot，因为这学期要考研，我又不希望为了一个简单的倒数功能去安装一个 APP，在这种需求下这个 Bot 可以完美的解决我的问题。<br><img src="/uploads/telegram-bot/countdown.png" alt="countdown"><br>这个 bot 支持设定时区，设定 Daily reminder 等，感觉很实用的。</p>
+<h2 id="Stickerdownloadbot"><a href="#Stickerdownloadbot" class="headerlink" title="Stickerdownloadbot"></a>Stickerdownloadbot</h2><p>Sticker 是 telegram 一个很棒的功能，可以自己制作表情包并轻松分享给他人使用。但是想要把表情包里的图片发到别的应用里却不是很容易，<a href="https://www.telegram.me/Stickerdownloadbot" target="_blank" rel="noopener">Stickerdownloadbot</a>可以帮你解决这一难题。<br><img src="/uploads/telegram-bot/sticker.png" alt="countdown"><br>它可以帮你把 sticker 转换成 png 格式的图片，是不是很棒呢。<br><br><br>哎，因为要考研，大概最近 blog 都不会有什么技术性文章的更新了。<br>哎，估计也没人看。<br><img src="/uploads/telegram-bot/放心吧不可能的.jpg" alt="放心吧不可能的"></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;最近经常用 Telegram，发现 Telegram 下有很多好用的 Bot，记录一下也让更多的朋友 play play。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>如何写一段简单的shellcode</title>
+    <link href="https://helloqiu.github.io/2017/10/04/%E5%A6%82%E4%BD%95%E5%86%99%E4%B8%80%E6%AE%B5%E7%AE%80%E5%8D%95%E7%9A%84shellcode/"/>
+    <id>https://helloqiu.github.io/2017/10/04/如何写一段简单的shellcode/</id>
+    <published>2017-10-03T17:28:40.000Z</published>
+    <updated>2018-10-04T13:29:12.181Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="0x0-唠叨"><a href="#0x0-唠叨" class="headerlink" title="0x0 唠叨"></a>0x0 唠叨</h1><p>许久未更新 blog，最近由于要考研忙得很，但是还是挤出时间来研究了一下 shellcode。<br>研究这个的原因是因为 CNSS 又一次把不用任何形式的括号写 helloworld 搬上了招新测试，本着搞事的原则，我决定花点时间来玩一玩。<br><a id="more"></a></p>
+<h1 id="0x1-思路"><a href="#0x1-思路" class="headerlink" title="0x1 思路"></a>0x1 思路</h1><p>不用任何形式的括号，大概的思路就是直接把机器码写到一个变量里，然后再运行这个变量里的机器码。<br>想到这里，你可能会一把梭的想到这样的一段汇编：<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="meta">section</span> .text</div><div class="line"><span class="meta">global</span> _start</div><div class="line"><span class="symbol">_start:</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">edx</span>,len</div><div class="line">  <span class="keyword">mov</span> <span class="built_in">ecx</span>,msg</div><div class="line">  <span class="keyword">mov</span> <span class="built_in">ebx</span>,<span class="number">1</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">eax</span>,<span class="number">4</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">eax</span>,<span class="number">1</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"></div><div class="line"><span class="meta">section</span> .data</div><div class="line"></div><div class="line">msg <span class="built_in">db</span> <span class="string">'Hello, world!'</span>, <span class="number">0xa</span></div><div class="line">len <span class="built_in">equ</span> $ - msg</div></pre></td></tr></table></figure></p>
+<p>嗯，这是一段很简单的 <em>x86 hello world</em> ，调用 linux 的系统调用然后打印输出数据段里的 <em>msg</em> 变量。<br>那我们试着把它变成 shellcode 来试试看。</p>
+<h1 id="0x2-错误的尝试"><a href="#0x2-错误的尝试" class="headerlink" title="0x2 错误的尝试"></a>0x2 错误的尝试</h1><p>那么我们先用汇编器把它变成 object file。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line">% nasm -f elf blog.asm</div><div class="line">% objdump -d blog.o</div><div class="line"></div><div class="line">blog.o:     file format elf32-i386</div><div class="line"></div><div class="line"></div><div class="line">Disassembly of section .text:</div><div class="line"></div><div class="line">00000000 &lt;_start&gt;:</div><div class="line">   0:	ba 0e 00 00 00       	mov    $0xe,%edx</div><div class="line">   5:	b9 00 00 00 00       	mov    $0x0,%ecx</div><div class="line">   a:	bb 01 00 00 00       	mov    $0x1,%ebx</div><div class="line">   f:	b8 04 00 00 00       	mov    $0x4,%eax</div><div class="line">  14:	cd 80                	int    $0x80</div><div class="line">  16:	b8 01 00 00 00       	mov    $0x1,%eax</div><div class="line">  1b:	cd 80                	int    $0x80</div></pre></td></tr></table></figure>
+<p>看起来很不错，然后我们把它放到 C 语言里面，然后用 attribute 指定变量放到 text 段里。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">char</span>* shellcode __attribute__((section(<span class="string">".text"</span>))) =</div><div class="line"><span class="string">"\xba\x0e\x00\x00\x00\xb9\x00\x00\x00\x00\xbb\x01\x00\x00\x00\xb8\x04\x00\x00\x00\xcd\x80\xb8\x01\x00\x00\x00\xcd\x80"</span>;</div></pre></td></tr></table></figure></p>
+<p>然后我们编译运行，似乎我们就要成功了，然后结果你肯定得到的程序无法运行，这是为什么呢？<br>我们来简单的 trace 一下我们生成的程序运行时的情况。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">% strace ./blog</div><div class="line">execve(&quot;./blog&quot;, [&quot;./blog&quot;], 0x7ffe0ad18d60 /* 37 vars */) = 0</div><div class="line">strace: [ Process PID=18003 runs in 32 bit mode. ]</div><div class="line">write(1, NULL, 14)                      = -1 EFAULT (Bad address)</div><div class="line">exit(1)                                 = ?</div><div class="line">+++ exited with 1 +++</div></pre></td></tr></table></figure></p>
+<p>哇，为什么我们的地址变成 NULL 了呢？<br>这是因为在这种情况下，我们没有办法获得到 data 段里的地址。</p>
+<h1 id="0x3-重新来过"><a href="#0x3-重新来过" class="headerlink" title="0x3 重新来过"></a>0x3 重新来过</h1><p>这时候我们就需要魔改一下我们的汇编。<br>大家都知道，在汇编中进行 call 的时候，当前运行到的地址会被 push 到栈中，利用这个特性，我们可以在我们定义变量之前进行一个 call，然后在 call 的这个函数里面 pop 出变量的地址。<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line"><span class="meta">global</span> _start</div><div class="line"><span class="meta">section</span> .text</div><div class="line"><span class="symbol">_start:</span></div><div class="line">  <span class="keyword">jmp</span> short wrapper</div><div class="line"><span class="symbol">shellcode:</span></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">eax</span>, <span class="built_in">eax</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">al</span>, <span class="number">0x4</span></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">ebx</span>, <span class="built_in">ebx</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">bl</span>, <span class="number">0x1</span></div><div class="line">  <span class="keyword">pop</span> <span class="built_in">ecx</span></div><div class="line"></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">edx</span>, <span class="built_in">edx</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">dl</span>, <span class="number">11</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">eax</span>, <span class="built_in">eax</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">al</span>, <span class="number">0x1</span></div><div class="line">  <span class="keyword">xor</span> <span class="built_in">ebx</span>, <span class="built_in">ebx</span></div><div class="line">  <span class="keyword">mov</span> <span class="built_in">bl</span>, <span class="number">0</span></div><div class="line">  <span class="keyword">int</span> <span class="number">0x80</span></div><div class="line"><span class="symbol"></span></div><div class="line">wrapper:</div><div class="line">  <span class="keyword">call</span> shellcode</div><div class="line"><span class="symbol">  message:</span> <span class="built_in">db</span> <span class="string">"bye world!"</span>, <span class="number">10</span></div></pre></td></tr></table></figure></p>
+<p>让我们再来试试：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">char</span>* main __attribute__((section(<span class="string">".text"</span>))) =</div><div class="line"><span class="string">"\xeb\x19\x31\xc0\xb0\x04\x31\xdb\xb3\x01\x59\x31\xd2\xb2\x0d\xcd\x80\x31\xc0\xb0\x01\x31\xdb\xb3\x00\xcd\x80\xe8\xe2\xff\xff\xff\x62\x79\x65\x20\x77\x6f\x72\x6c\x64\x21\x0a"</span>;</div></pre></td></tr></table></figure></p>
+<p><img src="/uploads/shellcode/result.png" alt="result"><br>哇，我们成功了！</p>
+<h1 id="尾声"><a href="#尾声" class="headerlink" title="尾声"></a>尾声</h1><p>所以这样我们就成功了，是不是很棒呢！<br>这只是 shellcode 的简单应用，具体如何真正应用 shellcode 去搞事情，等我哪天再有兴趣了再去研究。<br>（所以我最后还是用了小括号）逃）</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;h1 id=&quot;0x0-唠叨&quot;&gt;&lt;a href=&quot;#0x0-唠叨&quot; class=&quot;headerlink&quot; title=&quot;0x0 唠叨&quot;&gt;&lt;/a&gt;0x0 唠叨&lt;/h1&gt;&lt;p&gt;许久未更新 blog，最近由于要考研忙得很，但是还是挤出时间来研究了一下 shellcode。&lt;br&gt;研究这个的原因是因为 CNSS 又一次把不用任何形式的括号写 helloworld 搬上了招新测试，本着搞事的原则，我决定花点时间来玩一玩。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>深夜不想睡</title>
+    <link href="https://helloqiu.github.io/2017/08/02/%E6%B7%B1%E5%A4%9C%E4%B8%8D%E6%83%B3%E7%9D%A1/"/>
+    <id>https://helloqiu.github.io/2017/08/02/深夜不想睡/</id>
+    <published>2017-08-01T19:46:20.000Z</published>
+    <updated>2018-10-04T13:29:12.181Z</updated>
+    
+    <content type="html"><![CDATA[<p>现在是深夜的三点四十七分，距离我创建这篇 blog 一分钟。我想现在大部分的人都已经入睡了，我甚至还能音乐听到隔壁邻居的呼噜声。<br>但是我现在却不想睡。<br><img src="/uploads/深夜/深夜.jpg" alt="深夜"><br>这样的作息已经持续一个周多了，凌晨三四点睡着，中午十二点清醒。<br>不能入睡的原因并非不困，尽管习惯这种作息的我真的没有睡意。我想更多的原因是我现在的一种焦虑感。<br>我在担心很多的事情。比如我大学快要毕业了却还是单身，比如还有四个月就要考研了，我的复习计划实施起来却很困难，比如我毫无经济来源但是生活成本却在不断增加。<br>我焦虑于我的人际关系，焦虑于喜欢的女孩子拒绝了我，焦虑于自己心里孤单到不行的时候还是在向她倾诉，焦虑于她对我刻意保持的距离感。<br>我是一个要强的人，但有时，我又不是一个努力的人。<br><img src="/uploads/深夜/焦虑的杯子.jpg" alt="焦虑的杯子"><br>我在试着成长，我觉得我再心智方面一直是脆弱的，因为我没有经历过心智的磨炼。<br>也许这就是成长，我觉得当我懂得如何对这些焦虑泰然处之的时候，我会达到一个新的高度。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;现在是深夜的三点四十七分，距离我创建这篇 blog 一分钟。我想现在大部分的人都已经入睡了，我甚至还能音乐听到隔壁邻居的呼噜声。&lt;br&gt;但是我现在却不想睡。&lt;br&gt;&lt;img src=&quot;/uploads/深夜/深夜.jpg&quot; alt=&quot;深夜&quot;&gt;&lt;br&gt;这样的作息已经持续一个周
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>猫奴体验一个月</title>
+    <link href="https://helloqiu.github.io/2017/07/28/%E7%8C%AB%E5%A5%B4%E4%BD%93%E9%AA%8C%E4%B8%80%E4%B8%AA%E6%9C%88/"/>
+    <id>https://helloqiu.github.io/2017/07/28/猫奴体验一个月/</id>
+    <published>2017-07-28T11:52:10.000Z</published>
+    <updated>2018-10-04T13:29:12.182Z</updated>
+    
+    <content type="html"><![CDATA[<p>本文转自我的知乎。= =<br>暑假的时候 @吴不胖由于要外出打工，于是把他家的猫——榴莲放在了留守成都的我这，体验猫奴的日子已有一个月了。<br><a id="more"></a><br>在日天刚收养榴莲的时候，我就去看过榴莲，以下是榴莲三四个月大的时候。</p>
+<p><img src="/uploads/猫奴/榴莲-1.jpg" alt="榴莲三四个月"></p>
+<p>但随着年龄的增长，情况发生了变化。</p>
+<p><img src="/uploads/猫奴/榴莲-2.jpg" alt="霸道总裁"></p>
+<p>榴莲刚到我这里的时候，非常的怂，只敢在床底活动。</p>
+<p><img src="/uploads/猫奴/榴莲-3.jpg" alt="胆小鬼"></p>
+<p>但没两天熟悉环境之后，情况就不再是这样了。<br>榴莲作为一只土豪家的猫，过着锦衣玉食的生活，例如它拥有封闭式厕所，自动循环的饮水器，自动投食的喂食机。放荡不羁的它还学会了自拍(误</p>
+<p><img src="/uploads/猫奴/榴莲-4.jpg" alt="自拍"></p>
+<p>放纵的生活让榴莲养成了很多坏习惯，比如在猫砂达不到它的要求的时候，榴莲就会用尿被子的方式表达它的愤怒。在被尿多次之后，我最终决定，起床之后就把被子收到橱里T_T。</p>
+<p><img src="/uploads/猫奴/榴莲-5.jpg" alt="尿床"></p>
+<p>榴莲除了对厕所要求很高以外，对饮水的要求也很高。日天在把榴莲送过来的时候，也把能循环的饮水机带了过来，但只有这个机器的一部分。<br>饮水机由供电器，链接供电器和控制定时循环的底座，和储水器三个部分组成。底座是连接另外两个部分的重要部件，然而日天忘记拿了。<br>因此我拿了一个碗装了水放在喂食机旁边，但榴莲对碗里的水，毫无兴趣，反而去喝洗碗之后留在水槽里的水。为了榴莲的健康，我网购了一点小零件攒了一个底座，让水循环正常工作了。</p>
+<p><img src="/uploads/猫奴/饮水器.jpg" alt="饮水器"></p>
+<p>榴莲的日常就是在家里狂睡，还一定要在能看到我的地方睡，比如冰箱上。<br>在上完厕所之后会主动往腿上蹦，然后继续睡觉。<br>经常会霸占我的床，然后在我要睡觉的时候这样看着我。</p>
+<p><img src="/uploads/猫奴/榴莲-6.jpg" alt="葛优躺"></p>
+<p>榴莲会在我去洗手间的时候在门口偷窥，还被我发现了。</p>
+<p><img src="/uploads/猫奴/榴莲-7.jpg" alt="偷窥"></p>
+<p>作为一个临时猫奴，我在这一个月里体会到了猫奴的快乐，也体会到了日天在离开后发给我的“解放了”的理由。感觉以后我也会养猫。</p>
+<p><img src="/uploads/猫奴/榴莲-8.jpg" alt="呆滞"></p>
+<p>喵～</p>
+<p><img src="/uploads/猫奴/榴莲-9.jpg" alt="牵手手"></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;本文转自我的知乎。= =&lt;br&gt;暑假的时候 @吴不胖由于要外出打工，于是把他家的猫——榴莲放在了留守成都的我这，体验猫奴的日子已有一个月了。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="瞎扯" scheme="https://helloqiu.github.io/categories/%E7%9E%8E%E6%89%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>亲手打造FTP Server（一）介绍</title>
+    <link href="https://helloqiu.github.io/2017/07/24/%E4%BA%B2%E6%89%8B%E6%89%93%E9%80%A0FTP-Server%EF%BC%88%E4%B8%80%EF%BC%89/"/>
+    <id>https://helloqiu.github.io/2017/07/24/亲手打造FTP-Server（一）/</id>
+    <published>2017-07-24T15:36:06.000Z</published>
+    <updated>2018-10-04T13:29:12.180Z</updated>
+    
+    <content type="html"><![CDATA[<p><img src="/uploads/ftp1/ftp1-logo.png" alt="logo"></p>
+<h1 id="前记"><a href="#前记" class="headerlink" title="前记"></a>前记</h1><p>FTP 是 <em>File Transfer Protocol</em> 的缩写，顾名思义，是一种处于应用层的用于文件传输的协议。它曾红极一时，即使现在也有许多的应用实例。我将在接下来几篇 blog 中讲述我是如何编写一个最小 FTP Server 的。<br><a id="more"></a></p>
+<h1 id="协议简述"><a href="#协议简述" class="headerlink" title="协议简述"></a>协议简述</h1><p>FTP 协议可以分为两个部分，一部分用于传输控制命令，一部分用于传输需要的数据，比如当前的目录或者是要传输的文件。</p>
+<h2 id="被动模式"><a href="#被动模式" class="headerlink" title="被动模式"></a>被动模式</h2><p>在被动模式下，客户端通过控制命令与服务端交互，当需要传输数据时，服务器会在某个端口进行监听，并把端口号通过控制部分返回给客户端，当客户端连接上了这个端口，就可以进行数据的传输。<br><img src="/uploads/ftp1/ftp1-1.png" alt="simple example"><br>上图是一个简单的 server 和 client 通信的例子。<br>首先 client 向 server 发送了用户名和密码，server 验证成功后 client 向 server 发送 LIST 请求当前目录的文件列表，并指定使用 PASV 即被动模式。像之前所说的那样，server 打开了一个端口，并把地址和端口通过一个六元组的形式返回给了 client，client 只要再连接上这个地址和端口就可以获取到文件列表的数据。<br>以此类推，在被动模式下都是用类似的方式来传输数据的。</p>
+<h2 id="实现的命令"><a href="#实现的命令" class="headerlink" title="实现的命令"></a>实现的命令</h2><p>为了实现一个功能完整的 FTP Server，我从 FTP 协议中选择了以下几条命令来进行实现。</p>
+<ul>
+<li><strong>USER</strong><br>输入用户名。</li>
+<li><strong>PASS</strong><br>输入密码。</li>
+<li><strong>PWD</strong><br>显示当前目录。</li>
+<li><strong>MKD</strong><br>创建文件夹。</li>
+<li><strong>RMD</strong><br>删除文件夹。</li>
+<li><strong>MLSD</strong><br>如果目录被命名，列出目录的内容。</li>
+<li><strong>TYPE</strong><br>指定传输模式。</li>
+<li><strong>FEAT</strong><br>获取支持的模式。</li>
+<li><strong>LIST</strong><br>获取当前目录的内容。</li>
+<li><strong>CWD</strong><br>改变当前目录。</li>
+<li><strong>RETR</strong><br>传输文件。</li>
+<li><strong>STOR</strong><br>上传文件。</li>
+<li><strong>DELE</strong><br>删除文件。</li>
+<li><strong>RNTO</strong><br>重命名文件到指定位置。</li>
+</ul>
+<p>具体这些命令是如何实现的将在之后进行说明。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;&lt;img src=&quot;/uploads/ftp1/ftp1-logo.png&quot; alt=&quot;logo&quot;&gt;&lt;/p&gt;
+&lt;h1 id=&quot;前记&quot;&gt;&lt;a href=&quot;#前记&quot; class=&quot;headerlink&quot; title=&quot;前记&quot;&gt;&lt;/a&gt;前记&lt;/h1&gt;&lt;p&gt;FTP 是 &lt;em&gt;File Transfer Protocol&lt;/em&gt; 的缩写，顾名思义，是一种处于应用层的用于文件传输的协议。它曾红极一时，即使现在也有许多的应用实例。我将在接下来几篇 blog 中讲述我是如何编写一个最小 FTP Server 的。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>新的一年的Flag</title>
+    <link href="https://helloqiu.github.io/2017/01/10/%E6%96%B0%E7%9A%84%E4%B8%80%E5%B9%B4%E7%9A%84Flag/"/>
+    <id>https://helloqiu.github.io/2017/01/10/新的一年的Flag/</id>
+    <published>2017-01-10T14:59:23.000Z</published>
+    <updated>2018-10-04T13:29:12.181Z</updated>
+    
+    <content type="html"><![CDATA[<p>时间是个奇妙的东西，转眼新的一年就要到了，而我也将要在几天后正式结束大三上学期的生活。<br>新的一年，我想我需要立几个 Flag，然后看看我能不能成功的在明年收掉它。</p>
+<h2 id="Flag1：考研"><a href="#Flag1：考研" class="headerlink" title="Flag1：考研"></a>Flag1：考研</h2><p>现在已经大三了，而我为我选择的接下来几年的路是考研，再上个研究生。<br>其实我对将来的方向还是有许多的选择余地的。首先我可以选择继续学习，也可以选择就此工作，学习的话我既可以选择考研，也可以选择出国，工作的话我也感觉并不是很难找到一份薪资尚可的工作。<br>最终选择考研，是综合了很多方面的。首先我父母尽管没有和我明说，但是吃了学历亏的他们不甘心辛苦供养的孩子也就是我止步于本科学历，他们的圈子里普适的价值观也存在着对高学历的推崇。其次虽然现在互联网产业欣欣向荣，但表面的繁华让我更担心它破碎的一天，当一个行业不景气的时候，用来淘汰人的标准往往会多出一个学历。<br>所以我妥协了，我也需要研究生的这一段校园生活充盈我的知识，为我贴上更好的社会的标签。</p>
+<h2 id="Flag2：习惯孤单"><a href="#Flag2：习惯孤单" class="headerlink" title="Flag2：习惯孤单"></a>Flag2：习惯孤单</h2><p>一个人的生活，会非常的孤单或者寂寞，新的一年，我希望我能习惯它。</p>
+<h2 id="Flag3：变瘦"><a href="#Flag3：变瘦" class="headerlink" title="Flag3：变瘦"></a>Flag3：变瘦</h2><p>我太胖了，我需要减肥。</p>
+<p>希望我能快乐地活着。：）</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;时间是个奇妙的东西，转眼新的一年就要到了，而我也将要在几天后正式结束大三上学期的生活。&lt;br&gt;新的一年，我想我需要立几个 Flag，然后看看我能不能成功的在明年收掉它。&lt;/p&gt;
+&lt;h2 id=&quot;Flag1：考研&quot;&gt;&lt;a href=&quot;#Flag1：考研&quot; class=&quot;hea
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>记一次失败的技术尝试</title>
+    <link href="https://helloqiu.github.io/2017/01/03/%E8%AE%B0%E4%B8%80%E6%AC%A1%E5%A4%B1%E8%B4%A5%E7%9A%84%E6%8A%80%E6%9C%AF%E5%B0%9D%E8%AF%95/"/>
+    <id>https://helloqiu.github.io/2017/01/03/记一次失败的技术尝试/</id>
+    <published>2017-01-02T16:28:02.000Z</published>
+    <updated>2018-10-04T13:29:12.182Z</updated>
+    
+    <content type="html"><![CDATA[<p>之前有一段时间没有什么事情做，突然突发奇想，想要自己写一个 static blog generator。当你看到标题的时候，可能你已经意识到了这次重复造轮子计划是失败的，但我认为我在这一过程中还是收获了一些东西的，所以我要记录下来。<br><a id="more"></a></p>
+<h1 id="最初的想法"><a href="#最初的想法" class="headerlink" title="最初的想法"></a>最初的想法</h1><p>当我决定造这个轮子的时候，我知道现在已经有了很多实用的类似的工具，所以根据创新的理念，我要在这一次的尝试之中尝试一些新的东西。<br>现在的大部分静态博客工具的原理基本上是利用模板渲染的方法利用预先制作的主题即模板和博客的内容生成纯静态的 html 内容。模板渲染在现在这个前端火热的阶段来看有一些显得陈旧与笨拙，这种方式没有体现出现在前端的技术栈的优势所在，但我认为利用这种方法来生成博客没有什么黑点，它够简单也够方便。<br>当然它也有那么几个缺点，比如开发主题时不够方便，模板语言远没有现在流行的前后端分离的方式来的灵活多变。所以本着折腾的想法，一个创意出现在了我的脑海中。<br>首先我将记录博文内容的 markdown 文件编译成 html，然后将它存储到一个 sqlite 数据库文件中。这个文件就是整个博客的核心，在 generate 的时候，我将数据库中的文件通过一个简单的 web 服务器 serve 出来，然后通过前端的 pre-render 技术来生成最终静态的博客内容。</p>
+<h1 id="为什么失败"><a href="#为什么失败" class="headerlink" title="为什么失败"></a>为什么失败</h1><p>花费了半个月的业余时间，我成功的实现了前端以外的部分，我用 python 写了一个叫 catstalk 的包，在编译 markdown 的阶段比较简单，有现成的可以使用，sqlite 的部分我用了 peewee，写了几个简单的模型，至于 serve 的部分，我用 tornado 写了几个 api 用来 serve。我为这个包添加了详细的测试，并把它开源在了 <a href="https://github.com/helloqiu/Catstalk" target="_blank" rel="noopener">github</a> 上。<br>直到今天早上，我开始了前端部分的编写，这也是为什么我放弃了这个方案的原因。<br>首先前端我用了 vue 的方案，vuex + vue-router + vue-resource 的组合之前我也用过。可能作为一个前后端分离的 web 应用来说我是成功的，但作为一个以纯静态为目的的 blog 系统。<br>我花了大量的功夫在后端数据的请求上，模板渲染的方案完全不需要花费这么多功夫在这上面。其次，pre-render 实在是非常的不容易使用，我用了 prerender-spa-plugin 这个 webpack 的插件来生成静态的页面，它的方案是使用 phantom.js 来模拟浏览器运行前端的程序，在特定的条件满足之后把当前浏览器的页面生成为静态的 html 文件，这是行的通的，但它并不容易使用。其次是我对前端仍然并不熟悉，我很难独立完成这样一个前端的应用。<br>所以我放弃了。<br>sad（<br>所以我的确学到了不要轻易挖坑。<br>也许我可以再利用一下我的聪明才智思考一下有没有更加棒的方案。:)</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;之前有一段时间没有什么事情做，突然突发奇想，想要自己写一个 static blog generator。当你看到标题的时候，可能你已经意识到了这次重复造轮子计划是失败的，但我认为我在这一过程中还是收获了一些东西的，所以我要记录下来。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>新的一年以及关于感情的理性思考</title>
+    <link href="https://helloqiu.github.io/2017/01/01/%E6%96%B0%E7%9A%84%E4%B8%80%E5%B9%B4%E4%BB%A5%E5%8F%8A%E5%85%B3%E4%BA%8E%E6%84%9F%E6%83%85%E7%9A%84%E7%90%86%E6%80%A7%E6%80%9D%E8%80%83/"/>
+    <id>https://helloqiu.github.io/2017/01/01/新的一年以及关于感情的理性思考/</id>
+    <published>2016-12-31T18:53:05.000Z</published>
+    <updated>2018-10-04T13:29:12.181Z</updated>
+    
+    <content type="html"><![CDATA[<p>大概还在上小学的时候看到过一句话，说时间会随着年龄的增长过的越来越快。<br>要说过去的2016年在我看来是不是过的很快，我觉得我很难回答。过去一年的记忆在我的脑海中已经有些模糊了，回想起来，我只能勉强记得每个月在做什么，又只能记个大概。这也许就是记忆的妙处，它总是会留下一个大概的印象，然后忘掉细节。<br>整理一下记忆，我自然地总结出了去年的几件我做的事情和最后的结果。</p>
+<h2 id="编程的进步"><a href="#编程的进步" class="headerlink" title="编程的进步"></a>编程的进步</h2><p>在编程这一方面，我觉得我自己在这一段时间之中是进步了的，特别是在python编程方面。<br>与日天之间的交流对我而言是帮助巨大的。日天对编程的理解、积累与追求在我之上，在他的潜移默化下，我也渐渐沾染了些许这种气质。<br>我学习到了编程的一点精髓，之前的我认为衡量代码的标准是代码的正确与否，只要写出的代码能完成该有的功能即认为这是好代码。日天在维护werobot的过程中对我的pr的严格的review让我认识到好的代码是在功能完整的基础上，在可维护性和代码的简洁性中寻找一个平衡。<br>我想理解能力与逻辑思维是衡量程序员技术高低的基础，在这之上程序员的成就的高低取决于普遍适用的因素，天时地利人和。这种哲学式的领悟我觉得是珍贵无比的，如果每个人去编程的模式都是一种程序，这种领悟就像是对算法的优化，它往往远比用这段时间去运行这段程序收获的多。</p>
+<h2 id="情商的起起伏伏"><a href="#情商的起起伏伏" class="headerlink" title="情商的起起伏伏"></a>情商的起起伏伏</h2><p>在过去的一年中，我做了很多感情上在我看来是错误的事情。<br>在经历背叛与冷漠之后，我受到的打击颇大，它让我极度地缺乏安全感与对自己的信念。这也许也与我在情感上没有高情商的挚友有关，我心中的苦闷与愤怒无处发泄，又必须要发泄。<br>我开始在感情上做一个懦弱自私的人。我向我有好感的异性朋友哭诉寻找安慰，当我得到安慰之后，我像是溺水的人抓住了点什么一样拼命地想要握住它，我向她告白，我用极度理性的分析和哀求的语气索求。<br>不出所料，我搞砸了。<br>一夜夜的孤独与彷徨带给我的不仅有痛苦，这也让我重新审视自己。<br>我之前总愿意认为在我这个年龄段的男性是弱势的。从社会普适的价值观来看，衡量男性社会地位的标准往往会倾向于事业和金钱，而衡量女性的标准样貌往往占了上风。我这个年龄的男性正处于起步阶段，还一无所有，而女性正是青春靓丽的黄金阶段。我常常标榜自己对感情是专一与认真的，并且我认定将来我可以有一番自己的事业，我觉得自己是一匹期待着伯乐的千里马，我理应有自己的伯乐。<br>我曾茫然的认为我是对的，让自己快速增值的诱惑让我忽略了这只是对我未来的预期。<br>后来我又渐渐领悟，感情只靠理性的分析去选择是不可能的。<br>之前我对感情的认识是一片混沌，这片混沌带给我的痛苦让我本能地用理性和逻辑去在混沌中理出一些条条框框。感情本来就是极其重感性的一个东西，我想它该是一片混沌。</p>
+<p>哎，希望新的一年，我能成为一个忍受的了孤独的人。<br>希望走在夜里的路上我能不再害怕，希望寂寞的感情能让我听见心里话。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;大概还在上小学的时候看到过一句话，说时间会随着年龄的增长过的越来越快。&lt;br&gt;要说过去的2016年在我看来是不是过的很快，我觉得我很难回答。过去一年的记忆在我的脑海中已经有些模糊了，回想起来，我只能勉强记得每个月在做什么，又只能记个大概。这也许就是记忆的妙处，它总是会留下一
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>生日快乐</title>
+    <link href="https://helloqiu.github.io/2016/11/19/Birthday/"/>
+    <id>https://helloqiu.github.io/2016/11/19/Birthday/</id>
+    <published>2016-11-19T02:15:41.000Z</published>
+    <updated>2018-10-04T13:29:12.179Z</updated>
+    
+    <content type="html"><![CDATA[<p>11月19日，又是一年生日，祝我生日快乐。<br>想想自己又涨了一岁，惊异于心中不再有儿时的喜悦和激动，不再有对礼物的憧憬，不知从何时开始，生日这天的我充斥着迷茫与无助。我不知道自己该做什么，甚至不知道自己可以做什么。以我现在的状态，可能将来这么发展下去，只能当一个合格的码工，每日敲敲键盘，写一些自己都看不过去的业务代码。我恐惧于这样的未来。<br>我想，一个人总是要包裹在爱和快乐之中才有可能活下去的，可能我这种浑浑噩噩的心态正是源于我对感情的理想化的认识的破灭。感情上的打击让我本能的想淡化感情，感情的淡化让我感到孤独，让我和身边的大部分同龄人看待问题的角度完全不同。回想起来，我开始擅长于把问题抽象化，把感情量化，把物质金钱化，然后用数字和逻辑比较大小，最终选择看起来对我更有利的方案。<br>我知道这是错误的，但是这种做事方式能让我更好受，能让我尽量淡忘悲伤，这是一个感情上的弱者的妥协和自救。<br>是的，我在感情上是一个弱者，是一个失败者，我在十一个月之后，仍然在怀念着你，我甚至仍处在失恋的第一天，我闭上眼仍然满满的全是你的影子，我戒不掉这种思念，我甚至可以像《三体》里面的描述一样，在脑海中虚拟出一个你，然后自我欺骗式的和你对话。</p>
+<p><strong>想得却不可得，你奈人生何。该舍得舍不得，只顾着跟往事瞎扯。</strong></p>
+<p>李宗盛的这两句歌，让我听出了共鸣，也描述的确实是我现在的状态。<br>我觉得人总是要有点浪漫的，我无数次的想舍弃掉这种思念和痛苦，但是我做不到，并且我越来越习惯于待在这种痛苦中，并甘之如饴。<br>可能这就是我的浪漫吧。<br>愿明年的今天，我仍能找到自己的浪漫，生活在爱和快乐之中。<br>哦，再愿我能减肥成功。<br>哦，最后愿我能找到女朋友|･ω･｀)。<br>最后放一张日天家的榴莲。</p>
+<p><img src="/uploads/榴莲.jpg" alt="榴莲"></p>
+<p>嘿嘿|･ω･｀)。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;11月19日，又是一年生日，祝我生日快乐。&lt;br&gt;想想自己又涨了一岁，惊异于心中不再有儿时的喜悦和激动，不再有对礼物的憧憬，不知从何时开始，生日这天的我充斥着迷茫与无助。我不知道自己该做什么，甚至不知道自己可以做什么。以我现在的状态，可能将来这么发展下去，只能当一个合格的码
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>如何配合 travis 自动部署</title>
+    <link href="https://helloqiu.github.io/2016/10/07/HowToAutoDeployWithTravis/"/>
+    <id>https://helloqiu.github.io/2016/10/07/HowToAutoDeployWithTravis/</id>
+    <published>2016-10-07T08:59:16.000Z</published>
+    <updated>2018-10-04T13:29:12.180Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>在日常的 blog 编写中，一直有一点非常的不爽。在使用 <code>hexo generate &amp;&amp; hexo deploy</code> 之后，我还不得不登录到服务器 <code>git pull</code> 一下来更新。前一段时间和别人合作时看到了使用 <em>travis</em> 进行 auto deploy 的例子，感觉非常的方便。于是我在 google 中搜索了教程，虽然最后成功的完成了目标，但感觉教程只是把步骤记录了下来，没有讲解原理。这一篇文章中，我将把整个的部署过程记录下来，同时加入我对每一步在做什么的理解。<br><a id="more"></a></p>
+<h1 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h1><p>通过 <code>hexo deploy</code> 可以把当前的 <em>public</em> 文件夹下的内容复制到 <em>.deploy_git</em> 文件夹下，然后 push 到设置的 repo 下。配合着 <em>travis</em>，我们可以选择在每次 push 之后通过 <code>rsync</code> 把当前 repo 的文件同步到服务器上，达到自动部署的目的。</p>
+<h1 id="具体步骤"><a href="#具体步骤" class="headerlink" title="具体步骤"></a>具体步骤</h1><h2 id="生成-ssh-key"><a href="#生成-ssh-key" class="headerlink" title="生成 ssh-key"></a>生成 ssh-key</h2><p>将服务器上的文件与当前 repo 同步，需要用 ssh 登录到服务器上，而现在用密码登录是不靠谱的，在生产环境中普遍使用 RSA 密钥来登录，所以我们需要为自动部署生成一个用来登录到服务器的 RSA 密钥。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">ssh-keygen <span class="_">-f</span> ssh-key</div></pre></td></tr></table></figure></p>
+<p><img src="/uploads/HowToAutoDeployWithTravis-0.png" alt="ssh-keygen result"><br>为了方便，我们不设置 passphrase。<br>可以看到，我们生成了两个文件。<code>ssh-key.pub</code> 是 RSA 加密的公钥，<code>ssh-key</code> 是加密的密钥，我们需要把公钥的内容添加到服务器的 <code>authorized_keys</code> 里面。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">cat ssh-key.pub &gt;&gt; ~/.ssh/authorized_keys</div></pre></td></tr></table></figure></p>
+<h2 id="travis-配置文件"><a href="#travis-配置文件" class="headerlink" title="travis 配置文件"></a>travis 配置文件</h2><p>travis 需要在 repo 下添加配置文件并命名为 <code>travis.yml</code>。具体的配置方式在官网写的比较清楚。<br><figure class="highlight yaml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="attr">branches:</span></div><div class="line"><span class="attr">  only:</span></div><div class="line"><span class="bullet">  -</span> <span class="string">master</span></div><div class="line"><span class="attr">addons:</span></div><div class="line"><span class="attr">  ssh_known_hosts:</span> <span class="string">your.server</span></div><div class="line"><span class="attr">script:</span></div><div class="line"><span class="bullet">-</span> <span class="string">rsync</span> <span class="bullet">-az</span> <span class="bullet">-vv</span> <span class="bullet">--delete</span> <span class="bullet">--exclude=.git</span> <span class="bullet">-e</span> <span class="string">'ssh'</span> <span class="string">./</span> <span class="string">user@your.server:/where/the/folder</span></div></pre></td></tr></table></figure></p>
+<p><code>branches</code> 代表我们只需要 master 分支。<br><code>ssh_known_hosts</code> 的作用是把 server 的地址加入到 known_hosts 里面，否则 ssh 登陆的时候会提示是否要添加。<br><code>script</code> 里面的命令代表我们要使用 <code>rsync</code> 同步 repo 内容到 server 里面，由于是生产环境，我们不需要 <code>.git</code> 文件夹，所以把它排除。</p>
+<h2 id="使用-travis-加密密钥"><a href="#使用-travis-加密密钥" class="headerlink" title="使用 travis 加密密钥"></a>使用 travis 加密密钥</h2><p>我们需要让 travis 使用密钥登陆服务器，但如果直接把密钥放到 repo 里面，任何人都可以登录到服务器了，所以我们需要使用 travis 的加密功能把密钥加密。<br>travis 的客户端需要使用 <code>gem</code> 安装，并且需要 2.0 以上的版本。所以注意确认是否安装了合适的环境，并且把密钥文件拷贝到 repo 里面。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># Install travis</span></div><div class="line">gem install travis</div><div class="line"><span class="comment"># You should enter your github account</span></div><div class="line">travis login</div><div class="line"><span class="comment"># Encrypt the key</span></div><div class="line">travis encrypt-file ssh-key --add</div><div class="line"><span class="comment"># Remove the key</span></div><div class="line">rm ssh-key</div></pre></td></tr></table></figure></p>
+<p>运行完以上命令之后，<code>ssh-key</code> 文件被加密成了 <code>ssh-key.enc</code>，<code>.travis.yml</code> 文件里面多了 <em>before_install</em> 这个标签，里面的命令会在每次运行之前先用 <code>openssl</code> 把加密的密钥解密。默认的解密之后的输出目录是当前目录，记得把 <code>-out</code> 后面的目录改成 <code>~/.ssh/id_rsa</code>。</p>
+<h2 id="开启-travis"><a href="#开启-travis" class="headerlink" title="开启 travis"></a>开启 travis</h2><p>进入 travis 网站将你的 repo 添加进去。<br><img src="/uploads/HowToAutoDeployWithTravis-1.png" alt="travis"><br>这样，在你向 repo push 新的 commit 之后，travis 就会帮你自动部署啦。</p>
+<h1 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h1><p>其实挺简单。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;h1 id=&quot;前言&quot;&gt;&lt;a href=&quot;#前言&quot; class=&quot;headerlink&quot; title=&quot;前言&quot;&gt;&lt;/a&gt;前言&lt;/h1&gt;&lt;p&gt;在日常的 blog 编写中，一直有一点非常的不爽。在使用 &lt;code&gt;hexo generate &amp;amp;&amp;amp; hexo deploy&lt;/code&gt; 之后，我还不得不登录到服务器 &lt;code&gt;git pull&lt;/code&gt; 一下来更新。前一段时间和别人合作时看到了使用 &lt;em&gt;travis&lt;/em&gt; 进行 auto deploy 的例子，感觉非常的方便。于是我在 google 中搜索了教程，虽然最后成功的完成了目标，但感觉教程只是把步骤记录了下来，没有讲解原理。这一篇文章中，我将把整个的部署过程记录下来，同时加入我对每一步在做什么的理解。&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>中秋</title>
+    <link href="https://helloqiu.github.io/2016/09/14/Mid-Autumn-Festival/"/>
+    <id>https://helloqiu.github.io/2016/09/14/Mid-Autumn-Festival/</id>
+    <published>2016-09-14T12:18:44.000Z</published>
+    <updated>2018-10-04T13:29:12.180Z</updated>
+    
+    <content type="html"><![CDATA[<p>又是一年中秋节，祝我中秋节快乐。<br>回顾这一年来九个月的生活，还真应了宋胖子的那句歌：  </p>
+<p><strong>收得下过去，也给得了未来。</strong>  </p>
+<p>收得下过去，说的是虽然没当成那最强的那一个，至少也对得起自己，出力在生活着。即使脑中仍然在回响着那个声音，也守得住自己，守得住现状。<br>给得了未来，不管将来如何，有信心一步一步地走下去。  </p>
+<p>这九个月里面，感觉成长了不少，不管是从情商还是从技术上。<br>去年参加 CNSS 的招新赛的时候，第一次接触了 web 开发。记得当时熬了个通宵，从零学起 Flask，用了几天时间看文档写了一个招新平台。虽然现在看起来做的东西非常的幼稚和简单，但是确实感受到了 python 和编程的乐趣所在。虽然自己被 cnss 拒于门外，但是我发现了自己的兴趣。<br>接下来的时间便一直沉浸于 python 的各种 web 框架，从 django， flask， bottle 这些，一直到现在用的比较多的 Tornado。期间也学习了一些前端的知识，包括基本的页面设计还有 js 等，也曾心血来潮的学习了 es6， react 这些前端的知识，到现在可以用流行的 vue 来写正常的前端代码。<br>这九个月的飞速成长，离不开日天的支持，我也发现适合自己的进步的捷径，就是多关注厉害的人的学习的路线，然后总结，然后适配到自己。  </p>
+<p>至于情商方面，这九个月，失去了一些人，也认识了一些人。经历了世上的恶，幸好心中还存着善。放不下一些东西，也放下了一些东西。重视到了亲情的可贵，推广到了情的可贵。重要的是，我还可以坚定地走下去。  </p>
+<p>哎，一通胡诌乱扯，心情也变得好了起来。最后，以一句诗和一张桌面的图结尾。  </p>
+<p><strong>但愿人长久，千里共婵娟。</strong>  </p>
+<p><img src="/uploads/Mid-Autumn.jpg" alt="中秋节"></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;又是一年中秋节，祝我中秋节快乐。&lt;br&gt;回顾这一年来九个月的生活，还真应了宋胖子的那句歌：  &lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;收得下过去，也给得了未来。&lt;/strong&gt;  &lt;/p&gt;
+&lt;p&gt;收得下过去，说的是虽然没当成那最强的那一个，至少也对得起自己，出力在生活着。即使脑中
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>怎样用 WeRoBot 制作一个微信公众号</title>
+    <link href="https://helloqiu.github.io/2016/08/14/HowToMakeAWeChatOfficalAccount/"/>
+    <id>https://helloqiu.github.io/2016/08/14/HowToMakeAWeChatOfficalAccount/</id>
+    <published>2016-08-14T01:54:08.000Z</published>
+    <updated>2018-10-04T13:29:12.180Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="0x0-杂谈"><a href="#0x0-杂谈" class="headerlink" title="0x0 杂谈"></a>0x0 杂谈</h1><p>暑假里面除了在看书以外，还在维护 <em>whtsky</em> 的 <a href="https://github.com/whtsky/WeRoBot" target="_blank" rel="noopener">WeRoBot</a> 这个项目。WeRoBot 是他高一用 Python 写的一个微信的公众号开发框架，由于高考的原因他暂停了一段时间的维护。<br>上个学期在我的极力鼓吹下，我们一起用它申报了学院的创新创业项目，希望能得到一些经费用来继续维护。最终虽然经费不多，但是我们仍然在暑假开始之前开始了新版本的开发。<br>这篇文章我主要是想记录一下自己用 WeRoBot 制作进行微信公众号开发的过程，其实是非常有趣的。( ˙˘˙ )<br><a id="more"></a></p>
+<h1 id="0x1-谈谈需求"><a href="#0x1-谈谈需求" class="headerlink" title="0x1 谈谈需求"></a>0x1 谈谈需求</h1><p>那么到底我们要做一个怎样的公众号呢？这里我要引见一个新的项目。<br>在上一个暑假，<em>whtsky</em> 在暑假作业中用 <em>Python3.4 +</em> 出现的新特性协程(<em>Asyncio</em>)写了一个 DHT 爬虫，并且把抓到的种子信息做成了一个资源站，并且取名为 <strong>傻狍子</strong>。我们的公众号便是为傻狍子开发的，我们将把用户发给我们的一切信息作为检索条件，调用傻狍子的 API 来获取所有符合的种子信息，然后把信息返回给用户。  </p>
+<p><img src="/uploads/ShaPaoZi_Model.png" alt="ShaPaoZi Model"></p>
+<h1 id="0x2-开始干"><a href="#0x2-开始干" class="headerlink" title="0x2 开始干"></a>0x2 开始干</h1><p>首先，我们需要整理一下 ShaPaoZi 的 API。<br>我们的目的是从傻狍子搜索想要的种子信息，所以我们只需要搜索的这个 API。  </p>
+<p><img src="/uploads/ShaPaoZi_API.png" alt="ShaPaoZi API"><br>这个 API 的调用方法一目了然，不多赘述。  </p>
+<p>然后我们开始写真正的公众号部分。由于 WeRoBot 现在的新版本还在开发，而我又不打算有旧的代码，所以直接从 GitHub 克隆 <em>develop</em> 分支的代码。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># Life is short so let's just download one depth</span></div><div class="line">git <span class="built_in">clone</span> https://github.com/whtsky/WeRoBot --depth=1</div><div class="line"><span class="built_in">cd</span> WeRoBot</div><div class="line">python setup.py install</div><div class="line"><span class="built_in">cd</span> ..</div><div class="line">sudo rm -R WeRoBot</div></pre></td></tr></table></figure></p>
+<p>安装好了之后我们来创建一个 <em>app.py</em>，具体内容如下：<br><figure class="highlight python"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># -*- coding: utf-8 -*-</span></div><div class="line"></div><div class="line"><span class="keyword">from</span> werobot <span class="keyword">import</span> WeRoBot</div><div class="line"><span class="keyword">import</span> requests</div><div class="line"><span class="keyword">import</span> time</div><div class="line"></div><div class="line">token = <span class="string">'YourToken'</span></div><div class="line">encoding_aes_key = <span class="string">'YourKey'</span></div><div class="line">app_id = <span class="string">'YourID'</span></div><div class="line"></div><div class="line">robot = WeRoBot(token=token,</div><div class="line">                encoding_aes_key=encoding_aes_key,</div><div class="line">                app_id=app_id)</div><div class="line"></div><div class="line"></div><div class="line"><span class="meta">@robot.text</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">search</span><span class="params">(message)</span>:</span></div><div class="line">    url = <span class="string">'http://www.shapaozi.me/api/search/%s'</span> % message.content</div><div class="line">    result = requests.get(url).json()</div><div class="line">    return_value = <span class="string">''</span></div><div class="line">    return_value += <span class="string">'搜索到 %d 个结果:\n'</span> % result[<span class="string">'total'</span>]</div><div class="line">    <span class="keyword">for</span> page <span class="keyword">in</span> range(<span class="number">1</span>, result[<span class="string">'max_page'</span>] + <span class="number">1</span>):</div><div class="line">        <span class="keyword">if</span> page &gt; <span class="number">1</span>:</div><div class="line">            result = requests.get(url + (<span class="string">'/page/%d'</span> % page)).json()</div><div class="line">        <span class="keyword">for</span> r <span class="keyword">in</span> result[<span class="string">'results'</span>]:</div><div class="line">            return_value += <span class="string">'='</span> * <span class="number">5</span></div><div class="line">            return_value += <span class="string">'\n'</span></div><div class="line"></div><div class="line">            r[<span class="string">'last_seen'</span>] = time.strftime(<span class="string">"%Y-%m-%d %H:%M:%S"</span>, time.localtime(r[<span class="string">'last_seen'</span>]))</div><div class="line">            r[<span class="string">'length'</span>] = <span class="string">'%dMB'</span> % int(r[<span class="string">'length'</span>] / <span class="number">1024</span> / <span class="number">1024</span>)</div><div class="line"></div><div class="line">            return_value += <span class="string">'名称: %s\n'</span> % r[<span class="string">'title'</span>]</div><div class="line">            return_value += <span class="string">'大小: %s\n'</span> % r[<span class="string">'length'</span>]</div><div class="line">            return_value += <span class="string">'记录时间: %s\n'</span> % r[<span class="string">'last_seen'</span>]</div><div class="line">            return_value += <span class="string">'详情页: http://www.shapaozi.me/detail/%s\n'</span> % r[<span class="string">'infohash'</span>]</div><div class="line">            return_value += <span class="string">'='</span> * <span class="number">5</span></div><div class="line">            return_value += <span class="string">'\n'</span></div><div class="line"></div><div class="line">    <span class="keyword">return</span> return_value</div><div class="line"></div><div class="line"></div><div class="line"><span class="meta">@robot.subscribe</span></div><div class="line"><span class="function"><span class="keyword">def</span> <span class="title">hello</span><span class="params">(message)</span>:</span></div><div class="line">    <span class="keyword">return</span> <span class="string">'欢迎关注超级可爱的 ShaPaoZi ( ˙˘˙ )\n请直接回复查询内容。'</span></div><div class="line"></div><div class="line"></div><div class="line"><span class="keyword">from</span> bottle <span class="keyword">import</span> Bottle</div><div class="line"><span class="keyword">from</span> werobot.contrib.bottle <span class="keyword">import</span> make_view</div><div class="line"></div><div class="line">app = Bottle()</div><div class="line">app.route(<span class="string">'/robot'</span>,</div><div class="line">          [<span class="string">'GET'</span>, <span class="string">'POST'</span>],</div><div class="line">          make_view(robot))</div></pre></td></tr></table></figure></p>
+<p>我们总共设计了两个 handler，<em>hello</em> 用来发送欢迎信息，而 <em>search</em> 用来把用户发送的每一条消息当做搜索内容去傻狍子查询，再把查询结果调整一下返回给用户。<br>是不是非常的简单！最后我们使用 <em>Bottle</em> 来做 WEB 框架，并把访问路径设置成 <em>/robot</em>，这样我们的公众号就开发好了！</p>
+<h1 id="0x3-部署"><a href="#0x3-部署" class="headerlink" title="0x3 部署"></a>0x3 部署</h1><p>最终我们需要把这个服务部署到服务器上，首先用 <em>gunicorn</em> 把服务先跑起来，当然你也可以用其他的 <em>WSGI</em> Server。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">setsid gunicorn app:app --bind=<span class="string">"localhost:5000"</span> -w 4 --access-logfile access.log</div></pre></td></tr></table></figure></p>
+<p>这样公众号服务就在本地的 5000 端口启动了，并启动了四个线程。接下来使用 <em>nginx</em> 做一个反向代理，用 80 端口代理本地的 5000 端口。<br><em>nginx</em> 具体配置不贴了，看看文档比啥都强。  </p>
+<p>最终的效果图：<br><img src="/uploads/ShaPaoZi_Use.png" alt="ShaPaoZi_Use"></p>
+<h1 id="0x4-最后"><a href="#0x4-最后" class="headerlink" title="0x4 最后"></a>0x4 最后</h1><p>嘿嘿嘿，其实非常简单。( ˙˘˙ )</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;h1 id=&quot;0x0-杂谈&quot;&gt;&lt;a href=&quot;#0x0-杂谈&quot; class=&quot;headerlink&quot; title=&quot;0x0 杂谈&quot;&gt;&lt;/a&gt;0x0 杂谈&lt;/h1&gt;&lt;p&gt;暑假里面除了在看书以外，还在维护 &lt;em&gt;whtsky&lt;/em&gt; 的 &lt;a href=&quot;https://github.com/whtsky/WeRoBot&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;WeRoBot&lt;/a&gt; 这个项目。WeRoBot 是他高一用 Python 写的一个微信的公众号开发框架，由于高考的原因他暂停了一段时间的维护。&lt;br&gt;上个学期在我的极力鼓吹下，我们一起用它申报了学院的创新创业项目，希望能得到一些经费用来继续维护。最终虽然经费不多，但是我们仍然在暑假开始之前开始了新版本的开发。&lt;br&gt;这篇文章我主要是想记录一下自己用 WeRoBot 制作进行微信公众号开发的过程，其实是非常有趣的。( ˙˘˙ )&lt;br&gt;
+    
+    </summary>
+    
+      <category term="技术" scheme="https://helloqiu.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>HelloWorld</title>
+    <link href="https://helloqiu.github.io/2016/08/13/HelloWorld/"/>
+    <id>https://helloqiu.github.io/2016/08/13/HelloWorld/</id>
+    <published>2016-08-13T10:11:24.000Z</published>
+    <updated>2018-10-04T13:29:12.179Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="0x0-Hello-World"><a href="#0x0-Hello-World" class="headerlink" title="0x0 Hello World!"></a>0x0 Hello World!</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">Hello World!</div></pre></td></tr></table></figure>
+<h1 id="0x1-一些说明"><a href="#0x1-一些说明" class="headerlink" title="0x1 一些说明"></a>0x1 一些说明</h1><p>我的 Blog 又复活了诶，这一次我用了 <a href="https://hexo.io/zh-cn/" target="_blank" rel="noopener">Hexo</a> 来搭建这个 Blog，它可以生成静态的页面，并且有现成的主题，支持 MarkDown，感觉挺不错。<br>之所以再一次开 Blog，是因为感觉如果不把日常解决问题的思路和方法记录下来的话，很难记住什么东西，所以想用这个 Blog 做一个记录，记录下一些问题和想法。<br>虽然很有可能根本没有人来看我写的东西。<br>我开心就好。( ˙˘˙ )</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;h1 id=&quot;0x0-Hello-World&quot;&gt;&lt;a href=&quot;#0x0-Hello-World&quot; class=&quot;headerlink&quot; title=&quot;0x0 Hello World!&quot;&gt;&lt;/a&gt;0x0 Hello World!&lt;/h1&gt;&lt;figure class=&quot;high
+    
+    </summary>
+    
+      <category term="生活" scheme="https://helloqiu.github.io/categories/%E7%94%9F%E6%B4%BB/"/>
+    
+    
+  </entry>
+  
+</feed>
