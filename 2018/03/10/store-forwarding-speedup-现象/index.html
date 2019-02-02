@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html>
-<head>
+<head><meta name="generator" content="Hexo 3.8.0">
   <meta charset="utf-8">
   
   <title>Store-forwarding Speedup 现象 | Helloqiu&#39;s Blog | helloqiu 的博客</title>
@@ -22,12 +22,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
-  <meta property="og:title" content="Store-forwarding Speedup 现象"/>
+  <meta property="og:title" content="Store-forwarding Speedup 现象">
 
-  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog">
 
   
-  <meta property="og:image" content="/favicon.ico"/>
+  <meta property="og:image" content="/favicon.ico">
   
 
   <link href="/favicon.ico" rel="icon">
@@ -98,13 +98,13 @@
   <div class="article-content">
     <div class="entry">
       
-        <p>昨天我在知乎上看到了这样一个有趣的问题：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;stdio.h&gt;</span></span></div><div class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;time.h&gt;</span></span></div><div class="line"></div><div class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">int</span> p, q;</div><div class="line">    <span class="keyword">clock_t</span> s,e;</div><div class="line">    s=clock();</div><div class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; <span class="number">1000</span>; i++)&#123;</div><div class="line">        <span class="keyword">for</span>(<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; <span class="number">1000</span>; j++)&#123;</div><div class="line">            <span class="keyword">for</span>(<span class="keyword">int</span> k = <span class="number">1</span>; k &lt; <span class="number">1000</span>; k++)&#123;</div><div class="line">                p = i + j * k;</div><div class="line">                q = p;  <span class="comment">//Removing this line can increase running time.</span></div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    e = clock();</div><div class="line">    <span class="keyword">double</span> t = (<span class="keyword">double</span>)(e - s) / CLOCKS_PER_SEC;</div><div class="line">    <span class="built_in">printf</span>(<span class="string">"%lf\n"</span>, t);</div><div class="line">    <span class="keyword">return</span> <span class="number">0</span>;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
-<p>在一个三重循环的内部加入了一条赋值语句，却让整个程序的速度变快了！<br><a id="more"></a><br>对于这种类似玄学的问题，反正我是不太懂的，于是在好奇心的驱使下去 Stack Overflow 上提问了一下，没想到马上得到了解答。<br>首先，我把在 <strong>x64</strong> 下用 <strong>gcc 7.3.0</strong> 配合 <strong>-O0</strong> 得到的汇编代码放到了<a href="https://gist.github.com/helloqiu/0a3354cff566c240625e840f388ae00a" target="_blank" rel="noopener">这里</a>。<br>通过汇编我们可以看到，两份代码会议的不同就是在 <strong>addl $1, -12(%rbp)</strong> 之前，多了<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">movl	-<span class="number">44</span>(%rbp), %eax</div><div class="line">movl	%eax, -<span class="number">48</span>(%rbp)</div></pre></td></tr></table></figure></p>
+        <p>昨天我在知乎上看到了这样一个有趣的问题：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;time.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> p, q;</span><br><span class="line">    <span class="keyword">clock_t</span> s,e;</span><br><span class="line">    s=clock();</span><br><span class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; <span class="number">1000</span>; i++)&#123;</span><br><span class="line">        <span class="keyword">for</span>(<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; <span class="number">1000</span>; j++)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">int</span> k = <span class="number">1</span>; k &lt; <span class="number">1000</span>; k++)&#123;</span><br><span class="line">                p = i + j * k;</span><br><span class="line">                q = p;  <span class="comment">//Removing this line can increase running time.</span></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    e = clock();</span><br><span class="line">    <span class="keyword">double</span> t = (<span class="keyword">double</span>)(e - s) / CLOCKS_PER_SEC;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"%lf\n"</span>, t);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>在一个三重循环的内部加入了一条赋值语句，却让整个程序的速度变快了！<br><a id="more"></a><br>对于这种类似玄学的问题，反正我是不太懂的，于是在好奇心的驱使下去 Stack Overflow 上提问了一下，没想到马上得到了解答。<br>首先，我把在 <strong>x64</strong> 下用 <strong>gcc 7.3.0</strong> 配合 <strong>-O0</strong> 得到的汇编代码放到了<a href="https://gist.github.com/helloqiu/0a3354cff566c240625e840f388ae00a" target="_blank" rel="noopener">这里</a>。<br>通过汇编我们可以看到，两份代码会议的不同就是在 <strong>addl $1, -12(%rbp)</strong> 之前，多了<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">movl	-<span class="number">44</span>(%rbp), %eax</span><br><span class="line">movl	%eax, -<span class="number">48</span>(%rbp)</span><br></pre></td></tr></table></figure></p>
 <p>这两行。这就是问题的核心，明明多了这两个 memory -&gt; register 和 register -&gt; memory 的操作，为什么反而变快了？<br>根据 Stack Overflow 上的回答</p>
 <blockquote>
 <p>If you’re on Skylake, store/reload latency can actually be lower (better) when the reload can’t try to execute right away. Having more independent loads/stores in between the dependent pair may explain it in your case.</p>
 </blockquote>
-<p>大体意思是说在 store 之后重新 reload 之间如果加入一些不相关的 load/store，在 Skylake 上时延要短一些。所以这一部分的下一句<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">addl	<span class="number">$1</span>, -<span class="number">12</span>(%rbp)</div></pre></td></tr></table></figure></p>
+<p>大体意思是说在 store 之后重新 reload 之间如果加入一些不相关的 load/store，在 Skylake 上时延要短一些。所以这一部分的下一句<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">addl	<span class="number">$1</span>, -<span class="number">12</span>(%rbp)</span><br></pre></td></tr></table></figure></p>
 <p>也就是说，在两次 k + 1 并且 CMP 的过程中，本该串行的后续操作由于乱序执行或者分支预测或者其他某些技术，让内层循环的包含不相关的 load/store 的代码已经在流水线上执行了，这让这个 6 个周期的操作实际上减小到 4-5 个周期。</p>
 <p>同时，回答还补充了现代的 CPU 都支持 memory renaming （我猜和计算机系统结构讲的寄存器重命名类似）,也就是说根据分支预测，还在这里对 k 进行加一的时候，对 p 的操作就已经在执行了，但这样会造成数据冒险，这种内存重命名的方式可以解决这种冒险让这个解释成立。</p>
 <p>同时，回答还还补充了内层的循环是可以同时执行多个的，因为 memory-order buffer 可以追踪每次 load 之前的 store，不用等待 store 写入 L1D（一级数据缓存），保证了这种多循环并行的正确性。</p>
@@ -171,7 +171,7 @@
     <footer class="site-footer">
   <p class="site-info">
     
-    &copy; 2018 helloqiu
+    &copy; 2019 helloqiu
     
   </p>
 </footer>

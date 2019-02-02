@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html>
-<head>
+<head><meta name="generator" content="Hexo 3.8.0">
   <meta charset="utf-8">
   
   <title>如何配合 travis 自动部署 | Helloqiu&#39;s Blog | helloqiu 的博客</title>
@@ -22,12 +22,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
-  <meta property="og:title" content="如何配合 travis 自动部署"/>
+  <meta property="og:title" content="如何配合 travis 自动部署">
 
-  <meta property="og:site_name" content="Helloqiu&#39;s Blog"/>
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog">
 
   
-  <meta property="og:image" content="/favicon.ico"/>
+  <meta property="og:image" content="/favicon.ico">
   
 
   <link href="/favicon.ico" rel="icon">
@@ -100,11 +100,11 @@
       
         <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>在日常的 blog 编写中，一直有一点非常的不爽。在使用 <code>hexo generate &amp;&amp; hexo deploy</code> 之后，我还不得不登录到服务器 <code>git pull</code> 一下来更新。前一段时间和别人合作时看到了使用 <em>travis</em> 进行 auto deploy 的例子，感觉非常的方便。于是我在 google 中搜索了教程，虽然最后成功的完成了目标，但感觉教程只是把步骤记录了下来，没有讲解原理。这一篇文章中，我将把整个的部署过程记录下来，同时加入我对每一步在做什么的理解。<br><a id="more"></a></p>
 <h1 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h1><p>通过 <code>hexo deploy</code> 可以把当前的 <em>public</em> 文件夹下的内容复制到 <em>.deploy_git</em> 文件夹下，然后 push 到设置的 repo 下。配合着 <em>travis</em>，我们可以选择在每次 push 之后通过 <code>rsync</code> 把当前 repo 的文件同步到服务器上，达到自动部署的目的。</p>
-<h1 id="具体步骤"><a href="#具体步骤" class="headerlink" title="具体步骤"></a>具体步骤</h1><h2 id="生成-ssh-key"><a href="#生成-ssh-key" class="headerlink" title="生成 ssh-key"></a>生成 ssh-key</h2><p>将服务器上的文件与当前 repo 同步，需要用 ssh 登录到服务器上，而现在用密码登录是不靠谱的，在生产环境中普遍使用 RSA 密钥来登录，所以我们需要为自动部署生成一个用来登录到服务器的 RSA 密钥。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">ssh-keygen <span class="_">-f</span> ssh-key</div></pre></td></tr></table></figure></p>
-<p><img src="/uploads/HowToAutoDeployWithTravis-0.png" alt="ssh-keygen result"><br>为了方便，我们不设置 passphrase。<br>可以看到，我们生成了两个文件。<code>ssh-key.pub</code> 是 RSA 加密的公钥，<code>ssh-key</code> 是加密的密钥，我们需要把公钥的内容添加到服务器的 <code>authorized_keys</code> 里面。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">cat ssh-key.pub &gt;&gt; ~/.ssh/authorized_keys</div></pre></td></tr></table></figure></p>
-<h2 id="travis-配置文件"><a href="#travis-配置文件" class="headerlink" title="travis 配置文件"></a>travis 配置文件</h2><p>travis 需要在 repo 下添加配置文件并命名为 <code>travis.yml</code>。具体的配置方式在官网写的比较清楚。<br><figure class="highlight yaml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="attr">branches:</span></div><div class="line"><span class="attr">  only:</span></div><div class="line"><span class="bullet">  -</span> <span class="string">master</span></div><div class="line"><span class="attr">addons:</span></div><div class="line"><span class="attr">  ssh_known_hosts:</span> <span class="string">your.server</span></div><div class="line"><span class="attr">script:</span></div><div class="line"><span class="bullet">-</span> <span class="string">rsync</span> <span class="bullet">-az</span> <span class="bullet">-vv</span> <span class="bullet">--delete</span> <span class="bullet">--exclude=.git</span> <span class="bullet">-e</span> <span class="string">'ssh'</span> <span class="string">./</span> <span class="string">user@your.server:/where/the/folder</span></div></pre></td></tr></table></figure></p>
+<h1 id="具体步骤"><a href="#具体步骤" class="headerlink" title="具体步骤"></a>具体步骤</h1><h2 id="生成-ssh-key"><a href="#生成-ssh-key" class="headerlink" title="生成 ssh-key"></a>生成 ssh-key</h2><p>将服务器上的文件与当前 repo 同步，需要用 ssh 登录到服务器上，而现在用密码登录是不靠谱的，在生产环境中普遍使用 RSA 密钥来登录，所以我们需要为自动部署生成一个用来登录到服务器的 RSA 密钥。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh-keygen -f ssh-key</span><br></pre></td></tr></table></figure></p>
+<p><img src="/uploads/HowToAutoDeployWithTravis-0.png" alt="ssh-keygen result"><br>为了方便，我们不设置 passphrase。<br>可以看到，我们生成了两个文件。<code>ssh-key.pub</code> 是 RSA 加密的公钥，<code>ssh-key</code> 是加密的密钥，我们需要把公钥的内容添加到服务器的 <code>authorized_keys</code> 里面。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cat ssh-key.pub &gt;&gt; ~/.ssh/authorized_keys</span><br></pre></td></tr></table></figure></p>
+<h2 id="travis-配置文件"><a href="#travis-配置文件" class="headerlink" title="travis 配置文件"></a>travis 配置文件</h2><p>travis 需要在 repo 下添加配置文件并命名为 <code>travis.yml</code>。具体的配置方式在官网写的比较清楚。<br><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">branches:</span></span><br><span class="line"><span class="attr">  only:</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">master</span></span><br><span class="line"><span class="attr">addons:</span></span><br><span class="line"><span class="attr">  ssh_known_hosts:</span> <span class="string">your.server</span></span><br><span class="line"><span class="attr">script:</span></span><br><span class="line"><span class="bullet">-</span> <span class="string">rsync</span> <span class="bullet">-az</span> <span class="bullet">-vv</span> <span class="bullet">--delete</span> <span class="bullet">--exclude=.git</span> <span class="bullet">-e</span> <span class="string">'ssh'</span> <span class="string">./</span> <span class="string">user@your.server:/where/the/folder</span></span><br></pre></td></tr></table></figure></p>
 <p><code>branches</code> 代表我们只需要 master 分支。<br><code>ssh_known_hosts</code> 的作用是把 server 的地址加入到 known_hosts 里面，否则 ssh 登陆的时候会提示是否要添加。<br><code>script</code> 里面的命令代表我们要使用 <code>rsync</code> 同步 repo 内容到 server 里面，由于是生产环境，我们不需要 <code>.git</code> 文件夹，所以把它排除。</p>
-<h2 id="使用-travis-加密密钥"><a href="#使用-travis-加密密钥" class="headerlink" title="使用 travis 加密密钥"></a>使用 travis 加密密钥</h2><p>我们需要让 travis 使用密钥登陆服务器，但如果直接把密钥放到 repo 里面，任何人都可以登录到服务器了，所以我们需要使用 travis 的加密功能把密钥加密。<br>travis 的客户端需要使用 <code>gem</code> 安装，并且需要 2.0 以上的版本。所以注意确认是否安装了合适的环境，并且把密钥文件拷贝到 repo 里面。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># Install travis</span></div><div class="line">gem install travis</div><div class="line"><span class="comment"># You should enter your github account</span></div><div class="line">travis login</div><div class="line"><span class="comment"># Encrypt the key</span></div><div class="line">travis encrypt-file ssh-key --add</div><div class="line"><span class="comment"># Remove the key</span></div><div class="line">rm ssh-key</div></pre></td></tr></table></figure></p>
+<h2 id="使用-travis-加密密钥"><a href="#使用-travis-加密密钥" class="headerlink" title="使用 travis 加密密钥"></a>使用 travis 加密密钥</h2><p>我们需要让 travis 使用密钥登陆服务器，但如果直接把密钥放到 repo 里面，任何人都可以登录到服务器了，所以我们需要使用 travis 的加密功能把密钥加密。<br>travis 的客户端需要使用 <code>gem</code> 安装，并且需要 2.0 以上的版本。所以注意确认是否安装了合适的环境，并且把密钥文件拷贝到 repo 里面。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Install travis</span></span><br><span class="line">gem install travis</span><br><span class="line"><span class="comment"># You should enter your github account</span></span><br><span class="line">travis login</span><br><span class="line"><span class="comment"># Encrypt the key</span></span><br><span class="line">travis encrypt-file ssh-key --add</span><br><span class="line"><span class="comment"># Remove the key</span></span><br><span class="line">rm ssh-key</span><br></pre></td></tr></table></figure></p>
 <p>运行完以上命令之后，<code>ssh-key</code> 文件被加密成了 <code>ssh-key.enc</code>，<code>.travis.yml</code> 文件里面多了 <em>before_install</em> 这个标签，里面的命令会在每次运行之前先用 <code>openssl</code> 把加密的密钥解密。默认的解密之后的输出目录是当前目录，记得把 <code>-out</code> 后面的目录改成 <code>~/.ssh/id_rsa</code>。</p>
 <h2 id="开启-travis"><a href="#开启-travis" class="headerlink" title="开启 travis"></a>开启 travis</h2><p>进入 travis 网站将你的 repo 添加进去。<br><img src="/uploads/HowToAutoDeployWithTravis-1.png" alt="travis"><br>这样，在你向 repo push 新的 commit 之后，travis 就会帮你自动部署啦。</p>
 <h1 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h1><p>其实挺简单。</p>
@@ -168,7 +168,7 @@
     <footer class="site-footer">
   <p class="site-info">
     
-    &copy; 2018 helloqiu
+    &copy; 2019 helloqiu
     
   </p>
 </footer>

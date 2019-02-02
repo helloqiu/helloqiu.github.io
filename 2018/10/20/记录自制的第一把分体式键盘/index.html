@@ -1,0 +1,230 @@
+<!DOCTYPE HTML>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  
+  <title>记录自制的第一把分体式键盘 | Helloqiu&#39;s Blog | helloqiu 的博客</title>
+
+  
+  <meta name="author" content="helloqiu">
+  
+
+  
+  <meta name="description" content="helloqiu 的博客">
+  
+
+  
+  
+  <meta name="keywords" content="">
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="记录自制的第一把分体式键盘">
+
+  <meta property="og:site_name" content="Helloqiu&#39;s Blog">
+
+  
+  <meta property="og:image" content="/favicon.ico">
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Helloqiu&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">Helloqiu&#39;s Blog</a>
+    </h1>
+    <p class="site-description">helloqiu 的博客</p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        
+          <li><a href="/">主页</a></li>
+        
+      
+        
+          <li><a href="/archives">归档</a></li>
+        
+      
+        
+          <li><a href="/categories">分类</a></li>
+        
+      
+        
+          <li>
+            <a href="https://github.com/helloqiu"><i class="fab fa-github"></i></a>
+          </li>
+        
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <article>
+
+  
+    
+    <h3 class="article-title"><span>记录自制的第一把分体式键盘</span></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2018/10/20/记录自制的第一把分体式键盘/" rel="bookmark">
+        <time class="entry-date published" datetime="2018-10-20T09:00:05.000Z">
+          2018-10-20
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p><img src="/uploads/键盘/完成图.jpg" alt="完成图"><br>加入长亭已经快两个月了，在被公司大佬的 Ergodone 吸引之后，终于也忍不住入了分体式键盘的坑。<br>总的算起来，靠每天 <del>在公司摸鱼的时间</del> 一个小时的时间前后花了大概三天就做了出来，还是挺快的。<br>这篇文章就用来记录一下制作这个键盘的过程。<br><a id="more"></a></p>
+<h1 id="0x0-选择键盘"><a href="#0x0-选择键盘" class="headerlink" title="0x0 选择键盘"></a>0x0 选择键盘</h1><p>做一个键盘的第一步当然是选择喜欢的键盘啦~<br>在 GitHub 上其实有许多开源的键盘，一般都会提供 PCB 和教程。同样也有一个 repo 记录了许多开源的键盘以及介绍：<a href="https://github.com/help-14/mechanical-keyboard" target="_blank" rel="noopener">https://github.com/help-14/mechanical-keyboard</a>，可以方便的快速找到喜欢的键盘。<br>这次我选中的键盘叫 Redox,repo 地址在这里：<a href="https://github.com/mattdibi/redox-keyboard" target="_blank" rel="noopener">https://github.com/mattdibi/redox-keyboard</a>。<br><img src="/uploads/键盘/效果图.jpg" alt="效果图"><br>从 repo 中的效果图可以看到，它的配列大概是 6x5 的设计，相比于 Ergodone 这种比较大的键盘来说少了不少的按键，但这种设计的优点是键盘的尺寸也变小了。它的固件使用的是 <a href="https://github.com/qmk/qmk_firmware" target="_blank" rel="noopener">QMK firmware</a>,这样刷写固件和自定义按键都会比较方便。</p>
+<h1 id="0x1-需要的材料"><a href="#0x1-需要的材料" class="headerlink" title="0x1 需要的材料"></a>0x1 需要的材料</h1><p>由于这次要做的键盘基本属于全客制化，所以套件什么的肯定是没有的，所以一切都需要我们自己去做。</p>
+<h3 id="PCB"><a href="#PCB" class="headerlink" title="PCB"></a>PCB</h3><p>从官方的 repo 里我们可以找到作者提供的 PCB 文件，如果不需要更改的话，可以直接把里面的一个叫 <code>gerber_files.zip</code> 的文件发送给淘宝做 PCB 的卖家进行打样。我找的卖家最少一次做 5 个，费用是 140 元。<br>如果你是一个高段位玩家，需要对 PCB 进行一些更改，作者同样提供了设计文件，可以使用 <a href="http://kicad-pcb.org/" target="_blank" rel="noopener">Kicad</a> 进行更改。<br>更改完成后，需要点击这里重新生成 gerber 文件。<br><img src="/uploads/键盘/导出文件.jpg" alt="导出文件"><br>之后最好逐层检查一下生成的文件，因为一旦制作出了板子发现有问题就只能重新做了。<br><img src="/uploads/键盘/检查文件.jpg" alt="检查文件"><br>淘宝做好的 PCB：<br><img src="/uploads/键盘/pcb.jpg" alt="pcb">  </p>
+<h3 id="原件单"><a href="#原件单" class="headerlink" title="原件单"></a>原件单</h3><p>原 repo 里有一份 Bom list，所以我就直接翻译一下了。  </p>
+<table>
+<thead>
+<tr>
+<th>原件名称</th>
+<th>数量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1N4148 直插式二极管</td>
+<td>70</td>
+</tr>
+<tr>
+<td>PJ-320A 4p 3.5mm 音频接口</td>
+<td>2</td>
+</tr>
+<tr>
+<td>4.7kΩ 直插式电阻</td>
+<td>2</td>
+</tr>
+<tr>
+<td>6mm x 6mm x 4.3mm 轻触欧姆龙开关</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Arduino Pro Micro</td>
+<td>2</td>
+</tr>
+<tr>
+<td>TRRS 线（四段的音频线就可以）</td>
+<td>1</td>
+</tr>
+<tr>
+<td>M3 8mm 自攻丝螺丝</td>
+<td>10</td>
+</tr>
+<tr>
+<td>USB micro 线</td>
+<td>1</td>
+</tr>
+<tr>
+<td>你喜欢的键盘轴</td>
+<td>70</td>
+</tr>
+</tbody>
+</table>
+<p>当然，组装键盘还需要电烙铁，螺丝刀等工具。</p>
+<h3 id="外壳"><a href="#外壳" class="headerlink" title="外壳"></a>外壳</h3><p>外壳是所有材料中最头疼的，最终我选择了 3d 打印。在 thingiverse 上可以找到 redox 的外壳文件：<a href="https://www.thingiverse.com/thing:2886662" target="_blank" rel="noopener">https://www.thingiverse.com/thing:2886662</a>。<br>打印的话找淘宝的卖家大概花费是100块左右，但是其实精度并没有想象中的高，在把轴插到定位板的这个环节中由于定位板精度不够，我只能用小刀人工校正QAQ<br><img src="/uploads/键盘/外壳.jpg" alt="外壳"></p>
+<h1 id="0x2-焊接"><a href="#0x2-焊接" class="headerlink" title="0x2 焊接"></a>0x2 焊接</h1><p>完全参考 repo 中的说明：<a href="https://github.com/mattdibi/redox-keyboard/tree/master/redox" target="_blank" rel="noopener">https://github.com/mattdibi/redox-keyboard/tree/master/redox</a>。<br>焊接的话由于全都是直插式的原件所以并不是很困难，需要注意的是要<strong>分清楚二极管的正负</strong>。<br>由于焊接的过程中并没有拍照片所以这一部分就完全参考官方的说明吧。T_T  </p>
+<h1 id="0x3-固件"><a href="#0x3-固件" class="headerlink" title="0x3 固件"></a>0x3 固件</h1><h3 id="编译固件"><a href="#编译固件" class="headerlink" title="编译固件"></a>编译固件</h3><p>根据 <a href="https://docs.qmk.fm" target="_blank" rel="noopener">QMK</a> 文档中的介绍，最简单的构建方式是<a href="https://docs.qmk.fm/#/getting_started_build_tools?id=docker" target="_blank" rel="noopener">使用 docker</a>，官方提供了包含编译工具的一个 image，直接把源码挂载进去编译就可以了。<br>运行<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -e keymap=$键盘布局 -e keyboard=$键盘名称 --rm -v $源码路径:/qmk:rw edasque/qmk_firmware</span><br></pre></td></tr></table></figure></p>
+<p>建议根据作者的说明在 <code>config.h</code> 中启用 <code>EE_HANDS</code>，这样左右手刷写相同的固件就可以了。<br>之后静静等待奇迹的发生。如果一切顺利，编译好的固件会出现在源码的根目录。  </p>
+<h3 id="写入固件"><a href="#写入固件" class="headerlink" title="写入固件"></a>写入固件</h3><p>往 Arduino Pro Micro 中写入固件的话需要用到 <a href="https://www.nongnu.org/avrdude/" target="_blank" rel="noopener">avrdude</a>。<br>首先我们由于启用了 <code>EE_HANDS</code>，需要写入 EEPROM：<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">avrdude.exe -p atmega32u4 -P $串口号 -c avr109 -U eeprom:w:./qmk_firmware/keyboards/lets_split/eeprom-righthand.eep #左手使用 lefthand</span><br></pre></td></tr></table></figure></p>
+<p>在 EEPROM 中写入左右手的信息就不用我们为左右手编译两个不同的固件了。<br>之后就可以写入真正的固件了：<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">avrdude.exe -p atmega32u4 -c avr109 -U flash:w:"C:\code\qmk_firmware\redox_rev1_default.hex":i -P $串口号</span><br></pre></td></tr></table></figure></p>
+<p>用笔戳一下 reset 开关，固件就会开始写了。  </p>
+<h1 id="0x4-定制布局"><a href="#0x4-定制布局" class="headerlink" title="0x4 定制布局"></a>0x4 定制布局</h1><p>打开 <code>\keyboards\redox\keymaps\default\keymap.c</code>，按键的布局都在这里，可以根据 QMK 的<a href="https://docs.qmk.fm/#/keymap" target="_blank" rel="noopener">布局指南</a> 来修改。<br>分享我的布局：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* QWERTY</span></span><br><span class="line"><span class="comment"> * ,------------------------------------------------.            ,------------------------------------------------.</span></span><br><span class="line"><span class="comment"> * |`-Lyr2|   1  |   2  |   3  |   4  |   5  | Lyr1 |            | Lyr1 |   6  |   7  |   8  |   9  |   0  |--Lyr2|</span></span><br><span class="line"><span class="comment"> * |------+------+------+------+------+------+------|            |------+------+------+------+------+------+------|</span></span><br><span class="line"><span class="comment"> * | Tab  |   Q  |   W  |   E  |   R  |   T  |  [&#123;  |            |  &#125;]  |   Y  |   U  |   I  |   O  |   P  |   =  |</span></span><br><span class="line"><span class="comment"> * |------+------+------+------+------+------+------|            |------+------+------+------+------+------+------|</span></span><br><span class="line"><span class="comment"> * | Esc  |   A  |   S  |   D  |   F  |   G  | PgUp |            | End  |   H  |   J  |   K  |   L  |   ;: |   '  |</span></span><br><span class="line"><span class="comment"> * |------+------+------+------+------+------+------|            |------+------+------+------+------+------+------|</span></span><br><span class="line"><span class="comment"> * | Shift|   Z  |   X  |   C  |   V  |   B  | PgDn |            | Home |   N  |   M  |   ,  |   .  |   Up | Shift|</span></span><br><span class="line"><span class="comment"> * |------+------+------+------+------+------+------|            |------+------+------+------+------+------+------|</span></span><br><span class="line"><span class="comment"> * |  del |   +  |   -  |*(Alt)|/(Ctr)| Bcksp| Gui  |            |Enter |Space |  Alt |   \  | Left | Down | Right|</span></span><br><span class="line"><span class="comment"> * `------------------------------------------------'            `------------------------------------------------'</span></span><br><span class="line"><span class="comment"> */</span></span><br></pre></td></tr></table></figure></p>
+<p>修改完之后重新编译&amp;写入就可以了。  </p>
+
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/生活/">生活</a>, <a href="/categories/技术/">技术</a>
+    </span>
+    
+
+    
+
+    </div>
+
+    
+  </div>
+</article>
+
+  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
+
+	<script type="text/javascript">
+	var disqus_shortname = 'helloqiublog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
+
+
+
+
+
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    
+    &copy; 2019 helloqiu
+    
+  </p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>
